@@ -644,9 +644,8 @@ window.fbResetAll = () => {
   fbWriteFull("event2026/fun", {});
   fbWriteFull("event2026/shoot", {});
 };
-/* 裁判暫不同步到手機版（資料庫規則尚未開放 event2026/refs，會一直跳 PERMISSION_DENIED）
-   規則放行後把下一行的註解拿掉即可恢復 */
-// window.fbPushRefs = refs => fbWriteFull("event2026/refs", refs);
+/* 裁判只有主控版會寫入，沒有其他裝置會同時編輯，維持整包覆蓋即可 */
+window.fbPushRefs = refs => fbWriteFull("event2026/refs", refs);
 </script>
 <script>
 "use strict";

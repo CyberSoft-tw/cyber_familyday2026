@@ -203,7 +203,7 @@ function pushLeaf(path, value){
   if (fbSignedIn) run(); else fbQueue.push(run);
 }
 
-let liveScores = {}, liveFun = {}, liveShoot = {};
+let liveScores = {}, liveFun = {}, liveShoot = {}, liveRefs = {};
 /* 記錄「這台裝置剛剛自己改過」的欄位，短時間內不要被剛好慢到的遠端回傳蓋掉，避免畫面閃爍/跳回舊值 */
 const recentEdit = {};
 function markRecent(key){ recentEdit[key] = Date.now() + 1500; }
@@ -227,6 +227,11 @@ fbDb.ref("event2026/shoot").on("value", snap => {
     if (!liveShoot[kind]) liveShoot[kind] = {};
     Object.keys(sub).forEach(i => { if (!isRecent("sh:"+kind+":"+i)) liveShoot[kind][i] = sub[i]; });
   });
+  render();
+}, () => {});
+/* 裁判資料：只讀顯示，這份檔案沒有任何寫入 event2026/refs 的程式碼，工作人員無法在這裡改裁判 */
+fbDb.ref("event2026/refs").on("value", snap => {
+  liveRefs = snap.val() || {};
   render();
 }, () => {});
 
@@ -412,9 +417,10 @@ function renderSchedule(){
     const A = resolveEntrant(m.a), B = resolveEntrant(m.b);
     const s = liveScores[m.id] || {};
     const done = scoreOf(m.id) !== null;
+    const ref = liveRefs[m.id] || "";
     html += '<div class="card ' + m.sport + (done ? " qual" : "") + '">' +
       '<div class="ctop"><span class="tag">' + SPORT_LABEL[m.sport] + ' · ' + esc(m.gname) + ' ' + esc(m.lb) + '</span>' + (done ? '<span class="savedtag">✓ 已輸入</span>' : "") + '</div>' +
-      '<div class="cvenue">' + (m.t && m.t !== "—" ? esc(m.t) + "　" : "") + (VENUE_LABEL[m.v] || esc(m.v||"")) + '</div>' +
+      '<div class="cvenue">' + (m.t && m.t !== "—" ? esc(m.t) + "　" : "") + (VENUE_LABEL[m.v] || esc(m.v||"")) + (ref ? '　🚩 裁判　' + esc(ref) : "") + '</div>' +
       '<div class="scorerow"><span class="pname">' + esc(A.text) + '</span>' + stepperHTML("score", m.id, "a", s.a) + '</div>' +
       '<div class="scorerow"><span class="pname">' + esc(B.text) + '</span>' + stepperHTML("score", m.id, "b", s.b) + '</div>' +
       '<div class="cardfoot"><span class="clearlink" data-clear="score" data-key="' + m.id + '">清除這場比分</span></div>' +
