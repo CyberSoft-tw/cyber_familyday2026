@@ -121,6 +121,14 @@
   .savedtag{font-size:11px; color:var(--ok); font-weight:700;}
 
   .qualtag{font-size:10.5px; background:var(--gold); color:#fff; border-radius:6px; padding:1px 6px; margin-left:4px;}
+  /* 同分待加賽／預賽未登記完的暫定名次 */
+  .qualtag.tie{background:var(--red);}
+  .qualtag.pend{background:var(--sub);}
+  .card.tiecard{border-left-color:var(--red); background:#fff7f5;}
+  .tiebar{
+    background:#fff7f5; border:1.5px solid var(--red); color:var(--red);
+    border-radius:10px; padding:9px 12px; margin-bottom:10px; font-size:13px; font-weight:700; line-height:1.5;
+  }
 
   /* 裁判姓名加粗，讓現場工作人員一眼看到自己是不是這場的裁判 */
   .cvenue b{color:var(--ink); font-weight:800;}
@@ -274,8 +282,9 @@ fbDb.ref("event2026/fun").on("value", snap => {
   render();
 }, () => {});
 fbDb.ref("event2026/shoot").on("value", snap => {
-  const remote = snap.val() || { p:{}, f:{} };
-  ["p","f"].forEach(kind => {
+  const remote = snap.val() || {};
+  /* p=預賽、t=預賽加賽、f=決賽、ft=決賽加賽 */
+  ["p","t","f","ft"].forEach(kind => {
     const sub = remote[kind] || {};
     if (!liveShoot[kind]) liveShoot[kind] = {};
     Object.keys(sub).forEach(i => { if (!isRecent("sh:"+kind+":"+i)) liveShoot[kind][i] = sub[i]; });
@@ -411,7 +420,7 @@ function searchKeysOf(text){
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function fmtHM(min){ const h = Math.floor(min/60), m = min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); }
 /* 版號：與 index.html、board.html 同步遞增 */
-const APP_VER = "3.57.5";
+const APP_VER = "3.57.7";
 
 const SPORT_LABEL = { tt:"桌球", bad:"羽球", bb:"籃球" };
 const VENUE_LABEL = { "桌1":"🏓 桌1", "桌2":"🏓 桌2", "桌3":"🏓 桌3", "A面":"🏸 羽球A面", "B面":"🏸 羽球B面", "籃球場":"🏀 籃球場" };
@@ -452,16 +461,136 @@ function funScore(id){
   if (!f || f.r === "" || f.w === "" || f.r == null || f.w == null) return null;
   return { r:Number(f.r), w:Number(f.w) };
 }
+/* 計分器 kind → Firebase 欄位（p 預賽／t 預賽加賽／f 決賽／ft 決賽加賽） */
+const SHOOT_KIND = { shootp:"p", shoott:"t", shootf:"f", shootft:"ft" };
 function shootVal(kind, i){
   const o = liveShoot[kind];
   const v = o ? o[i] : null;
   return (v === "" || v == null) ? null : Number(v);
 }
-function shootTop4(){
+/* ===== 晉級與加賽判定（board.html / staff.html / index.html 共用同一套規則） =====
+   欄位：p=預賽得分、t=預賽加賽得分、f=決賽得分、ft=決賽加賽得分
+   規則：
+   1. 預賽全部登記完，才會產生正式晉級名單；未登記完只顯示灰色「暫定」。
+   2. 第 4 名同分不再用名冊順序硬分，改由同分者登記「加賽得分」決定。
+      加賽若又同分，把加賽得分清掉重填下一輪即可，看板會持續提示 → 等於可以比到分出為止。
+   3. 決賽冠亞季同分同樣用「決賽加賽」分出（第 4 名同分不影響頒獎，直接並列）。 */
+const SHOOT_QUOTA = 4;                       // 預賽取前 4 名進總決賽
+function shootDoneCount() {
+  let n = 0;
+  SHOOTERS.forEach((p, i) => { if (shootVal("p", i) !== null) n++; });
+  return n;
+}
+function shootPrelimComplete() { return shootDoneCount() >= SHOOTERS.length; }
+/* 預賽依得分分群（同分為一群），分數由高到低：[{v, ids:[選手index]}] */
+function shootGroups() {
   const arr = [];
   SHOOTERS.forEach((p, i) => { const v = shootVal("p", i); if (v !== null) arr.push({ i:i, v:v }); });
   arr.sort((a, b) => b.v - a.v || a.i - b.i);
-  return arr.slice(0, 4);
+  const gs = [];
+  arr.forEach(x => {
+    const g = gs[gs.length - 1];
+    if (g && g.v === x.v) g.ids.push(x.i); else gs.push({ v:x.v, ids:[x.i] });
+  });
+  return gs;
+}
+/* 晉級判定
+   { list:晉級者index[]（未登記完時為暫定領先）, locked:是否已定案, complete:預賽是否登記完,
+     ranks:{index:名次}, tieIds:卡在最後名額待加賽者[], tieNeed:這群人要搶幾個名額, tieAgain:加賽後仍同分 } */
+function shootQualify() {
+  const gs = shootGroups();
+  const ranks = {};
+  let pos = 1;
+  gs.forEach(g => { g.ids.forEach(i => { ranks[i] = pos; }); pos += g.ids.length; });
+  const out = { list:[], locked:false, complete:shootPrelimComplete(), ranks:ranks, tieIds:[], tieNeed:0, tieAgain:false };
+  let need = SHOOT_QUOTA, gi = 0;
+  while (gi < gs.length && need > 0 && gs[gi].ids.length <= need) {
+    gs[gi].ids.forEach(i => out.list.push(i));
+    need -= gs[gi].ids.length;
+    gi++;
+  }
+  if (!out.complete) {                                   // 預賽還沒登記完 → 只給暫定領先，不鎖定
+    if (need > 0 && gi < gs.length) gs[gi].ids.slice(0, need).forEach(i => out.list.push(i));
+    return out;
+  }
+  if (need <= 0 || gi >= gs.length) { out.locked = true; return out; }   // 剛好取滿，或報名人數不足 4 人
+  const tie = gs[gi];                                    // 卡在最後名額的同分群
+  const tv = tie.ids.map(i => ({ i:i, t:shootVal("t", i) }));
+  if (tv.some(x => x.t === null)) {                      // 還有人沒登記加賽得分
+    out.tieIds = tie.ids.slice(); out.tieNeed = need; return out;
+  }
+  tv.sort((a, b) => b.t - a.t);
+  if (tv[need - 1].t === tv[need].t) {                   // 加賽又同分 → 再比一次
+    out.tieIds = tie.ids.slice(); out.tieNeed = need; out.tieAgain = true; return out;
+  }
+  tv.slice(0, need).forEach(x => out.list.push(x.i));
+  out.locked = true;
+  return out;
+}
+/* 沿用舊介面：回傳晉級（或暫定領先）名單 [{i, v}] */
+function shootTop4() { const q = shootQualify(); return q.list.map(i => ({ i:i, v:shootVal("p", i) })); }
+/* 名單太長時只列前 8 位，避免看板被一長串名字塞爆 */
+function shootNameList(ids) {
+  const ns = ids.map(i => SHOOTERS[i][1]);
+  return ns.length > 8 ? ns.slice(0, 8).join("、") + " …等 " + ns.length + " 人" : ns.join("、");
+}
+function shootTieNote() {
+  const q = shootQualify();
+  if (!q.complete) {
+    const n = shootDoneCount();
+    return n ? "預賽登記中（" + n + "/" + SHOOTERS.length + " 人）：全部登記完才會產生正式晉級名單，未到場者請直接填 0 分" : "";
+  }
+  if (!q.tieIds.length) return "";
+  return (q.tieAgain ? "⚠ 加賽仍同分，請再加賽一次（把加賽得分清掉重填）：" :
+                       "⚠ 並列第 " + (q.list.length + 1) + " 名，請現場加賽並登記「加賽得分」：") +
+         shootNameList(q.tieIds) + "（" + q.tieIds.length + " 人爭 " + q.tieNeed + " 個名額）";
+}
+/* 總決賽名次：依決賽得分排序；同分且涉及冠亞季 → 用「決賽加賽」分出，比到分出為止
+   { rows:[{i,p,f,ft,rank,tie}], settled:名次全部定案, tieIds:待加賽者, tieAgain:加賽後仍同分 } */
+function shootFinalInfo() {
+  const q = shootQualify();
+  const empty = { rows:[], settled:false, tieIds:[], tieAgain:false, qualify:q };
+  if (!q.locked || q.list.length < SHOOT_QUOTA) return empty;
+  const arr = q.list.map(i => ({ i:i, p:shootVal("p", i), f:shootVal("f", i), ft:shootVal("ft", i) }));
+  if (arr.some(x => x.f === null)) return empty;         // 決賽分數還沒登記完
+  arr.sort((a, b) => b.f - a.f);
+  const gs = [];
+  arr.forEach(x => {
+    const g = gs[gs.length - 1];
+    if (g && g.f === x.f) g.ids.push(x); else gs.push({ f:x.f, ids:[x] });
+  });
+  const rows = [], tieIds = [];
+  let pos = 1, tieAgain = false;
+  gs.forEach(g => {
+    if (g.ids.length === 1) { g.ids[0].rank = pos; rows.push(g.ids[0]); pos++; return; }
+    if (pos > 3) {                                       // 第 4 名之後同分不影響頒獎 → 直接並列
+      g.ids.forEach(x => { x.rank = pos; x.tie = true; rows.push(x); });
+      pos += g.ids.length; return;
+    }
+    if (g.ids.every(x => x.ft !== null)) {               // 加賽得分都填了 → 看能不能分出
+      const s = g.ids.slice().sort((a, b) => b.ft - a.ft);
+      let dup = false;
+      for (let k = 1; k < s.length; k++) if (s[k].ft === s[k - 1].ft) dup = true;
+      if (!dup) { s.forEach(x => { x.rank = pos; rows.push(x); pos++; }); return; }
+      tieAgain = true;
+    }
+    g.ids.forEach(x => { x.rank = pos; x.tie = true; rows.push(x); tieIds.push(x.i); });
+    pos += g.ids.length;
+  });
+  return { rows:rows, settled:tieIds.length === 0, tieIds:tieIds, tieAgain:tieAgain, qualify:q };
+}
+function shootFinalTieNote() {
+  const fi = shootFinalInfo();
+  if (!fi.rows.length || fi.settled || !fi.tieIds.length) return "";
+  return (fi.tieAgain ? "⚠ 決賽加賽仍同分，請再加賽一次（把加賽得分清掉重填）：" :
+                        "⚠ 決賽同分，請加賽決定名次並登記「加賽」得分：") + shootNameList(fi.tieIds);
+}
+/* 沿用舊介面：finalOnly=true 時，名次未全部定案就回傳空陣列（冠亞季只在定案後才公布） */
+function shootRank(finalOnly) {
+  const fi = shootFinalInfo();
+  if (!fi.rows.length) return [];
+  if (finalOnly && !fi.settled) return [];
+  return fi.rows;
 }
 
 let state = { view:"schedule", s:"all", q:"", sq:"", sf:"all" };
@@ -542,7 +671,8 @@ function stepperHTML(kind, key, sub, val){
 function updateShootChipCount(){
   const el = document.querySelector('#shootChips .chip[data-sf="top4"]');
   if (!el) return;
-  const n = shootTop4().length;
+  const q = shootQualify();
+  const n = q.list.length + q.tieIds.length;
   el.innerHTML = "🏆 前 4 名" + (n ? '<span class="cnt">' + n + '</span>' : "");
 }
 
@@ -632,32 +762,54 @@ function renderFun(){
 
 /* ===== 投籃大賽 ===== */
 function renderShoot(){
-  const top = shootTop4();
-  const topSet = {}; top.forEach((t, k) => { topSet[t.i] = k + 1; });
+  const q = shootQualify();
+  const fi = shootFinalInfo();
+  const pos = {}; q.list.forEach((i, k) => { pos[i] = k + 1; });
+  const tieSet = {}; q.tieIds.forEach(i => { tieSet[i] = 1; });
+  const finTie = {}; fi.tieIds.forEach(i => { finTie[i] = 1; });
   const sq = state.sq.trim().toLowerCase();
   // 晉級名次一律以全體 29 人的預賽成績計算，搜尋與篩選只影響「顯示哪幾張卡片」
+  const inTop = i => !!pos[i] || !!tieSet[i];
   const hits = SHOOTERS.map((p, i) => i).filter(i => {
-    if (state.sf === "top4" && !topSet[i]) return false;
+    if (state.sf === "top4" && !inTop(i)) return false;
     if (!sq) return true;
     const p = SHOOTERS[i];
     return (p[0] + " " + p[1] + " " + p[2] + " " + searchKeysOf(p[1])).toLowerCase().indexOf(sq) >= 0;
   });
   // 只看前 4 名時，改用名次排序（預設是名冊順序，看不出誰第幾名）
-  if (state.sf === "top4") hits.sort((a, b) => topSet[a] - topSet[b]);
-  let html = '<div class="empty" style="padding:10px 4px;text-align:left;color:var(--sub);font-size:12.5px">預賽取前 4 名進總決賽；決賽分數只有晉級者需要填。</div>';
+  if (state.sf === "top4") hits.sort((a, b) => (pos[a] || 98) - (pos[b] || 98) || a - b);
+
+  const doneN = shootDoneCount();
+  let hint = "預賽取前 4 名進總決賽；決賽分數只有晉級者需要填。";
+  if (!q.complete) hint = "預賽登記中（" + doneN + "/" + SHOOTERS.length + " 人）。⚠ 全部登記完才會產生正式晉級名單，未到場者請直接填 0 分。";
+  let html = '<div class="empty" style="padding:10px 4px;text-align:left;color:var(--sub);font-size:12.5px">' + esc(hint) + '</div>';
+  const note = q.complete ? shootTieNote() : "";
+  const fnote = shootFinalTieNote();
+  const banner = t => '<div class="tiebar">' + esc(t) + '</div>';
+  if (note) html += banner(note);
+  if (fnote) html += banner(fnote);
   if (!hits.length) {
-    if (state.sf === "top4" && !top.length) return html + '<div class="empty">尚無預賽成績<br><span style="font-size:12.5px">要先輸入預賽得分，才排得出前 4 名</span></div>';
+    if (state.sf === "top4" && !q.list.length && !q.tieIds.length) return html + '<div class="empty">尚無預賽成績<br><span style="font-size:12.5px">要先輸入預賽得分，才排得出前 4 名</span></div>';
     if (state.sf === "top4") return html + '<div class="empty">前 4 名裡找不到符合的選手</div>';
     return html + '<div class="empty">找不到符合的選手</div>';
   }
   hits.forEach(i => {
     const p = SHOOTERS[i];
-    const pv = shootVal("p", i);
-    const rk = topSet[i];
-    html += '<div class="card' + (rk ? " qual" : "") + '">' +
-      '<div class="ctop"><span class="tag">' + esc(p[1]) + '　<span style="color:var(--sub);font-weight:600">' + esc(p[0]) + '</span></span>' + (rk ? '<span class="qualtag">晉級 ' + rk + '</span>' : "") + '</div>' +
-      '<div class="scorerow"><span class="pname">預賽得分</span>' + stepperHTML("shootp", i, "p", pv) + '</div>' +
-      (rk ? '<div class="scorerow"><span class="pname">決賽得分</span>' + stepperHTML("shootf", i, "f", shootVal("f", i)) + '</div>' : "") +
+    const qualified = q.locked && pos[i];
+    const inTie = !!tieSet[i];
+    const tag = qualified ? '<span class="qualtag">晉級 ' + pos[i] + '</span>'
+      : inTie ? '<span class="qualtag tie">並列・待加賽</span>'
+      : (!q.complete && pos[i]) ? '<span class="qualtag pend">暫定 ' + pos[i] + '</span>' : "";
+    html += '<div class="card' + (qualified ? " qual" : inTie ? " tiecard" : "") + '">' +
+      '<div class="ctop"><span class="tag">' + esc(p[1]) + '　<span style="color:var(--sub);font-weight:600">' + esc(p[0]) + '</span></span>' + tag + '</div>' +
+      '<div class="scorerow"><span class="pname">預賽得分</span>' + stepperHTML("shootp", i, "p", shootVal("p", i)) + '</div>' +
+      // 卡在晉級線上的同分者才需要「預賽加賽」
+      (inTie || shootVal("t", i) !== null ?
+        '<div class="scorerow"><span class="pname">預賽加賽得分</span>' + stepperHTML("shoott", i, "t", shootVal("t", i)) + '</div>' : "") +
+      (qualified ? '<div class="scorerow"><span class="pname">決賽得分</span>' + stepperHTML("shootf", i, "f", shootVal("f", i)) + '</div>' : "") +
+      // 決賽冠亞季同分時才需要「決賽加賽」
+      (qualified && (finTie[i] || shootVal("ft", i) !== null) ?
+        '<div class="scorerow"><span class="pname">決賽加賽得分</span>' + stepperHTML("shootft", i, "ft", shootVal("ft", i)) + '</div>' : "") +
       '<div class="cardfoot"><span class="clearlink" data-clear="shoot" data-key="' + i + '">清除這位選手的分數</span></div>' +
     '</div>';
   });
@@ -684,7 +836,7 @@ function render(){
 function getStepValue(kind, key, sub){
   if (kind === "score") { const cur = liveScores[key] || {}; return cur[sub]; }
   if (kind === "fun") { const cur = liveFun[key] || {}; return cur[sub]; }
-  if (kind === "shootp" || kind === "shootf") { const k = kind === "shootp" ? "p" : "f"; return (liveShoot[k] || {})[key]; }
+  if (SHOOT_KIND[kind]) return (liveShoot[SHOOT_KIND[kind]] || {})[key];
 }
 function setStepValue(kind, key, sub, v){
   if (kind === "score") {
@@ -697,8 +849,8 @@ function setStepValue(kind, key, sub, v){
     liveFun[key] = Object.assign({}, cur); liveFun[key][sub] = v;
     markRecent("f:"+key);
     pushLeaf("event2026/fun/" + key + "/" + sub, v);
-  } else if (kind === "shootp" || kind === "shootf") {
-    const k = kind === "shootp" ? "p" : "f";
+  } else if (SHOOT_KIND[kind]) {
+    const k = SHOOT_KIND[kind];
     if (!liveShoot[k]) liveShoot[k] = {};
     liveShoot[k][key] = v;
     markRecent("sh:"+k+":"+key);
@@ -728,11 +880,12 @@ document.getElementById("main").addEventListener("click", ev => {
       pushLeaf("event2026/fun/" + key + "/w", "");
       liveFun[key] = { r:"", w:"" }; markRecent("f:"+key);
     } else if (kind === "shoot") {
-      pushLeaf("event2026/shoot/p/" + key, "");
-      pushLeaf("event2026/shoot/f/" + key, "");
-      if (!liveShoot.p) liveShoot.p = {}; if (!liveShoot.f) liveShoot.f = {};
-      liveShoot.p[key] = ""; liveShoot.f[key] = "";
-      markRecent("sh:p:"+key); markRecent("sh:f:"+key);
+      ["p","t","f","ft"].forEach(k => {
+        pushLeaf("event2026/shoot/" + k + "/" + key, "");
+        if (!liveShoot[k]) liveShoot[k] = {};
+        liveShoot[k][key] = "";
+        markRecent("sh:"+k+":"+key);
+      });
     }
     render();
     return;

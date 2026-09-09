@@ -144,6 +144,10 @@
   .shrow .shname{flex:1; min-width:0; font-weight:600;}
   .shrow .shunit{display:block; color:var(--sub); font-size:11px; font-weight:600;}
   .shrow .shtag{flex:none; font-size:10.5px; font-weight:800; color:#fff; background:var(--bb); border-radius:6px; padding:2px 6px;}
+  /* 同分待加賽／預賽未登記完的暫定名次 */
+  .shrow .shtag.tie{background:var(--red);}
+  .shrow .shtag.pend{background:var(--sub);}
+  .shrow.tierow{border-color:var(--red); background:#fff7f5;}
   .shrow .shsc{flex:none; font-variant-numeric:tabular-nums; font-weight:800; font-size:15px; min-width:30px; text-align:right;}
 
   .rosterhd{padding:10px 16px 0; display:flex; gap:8px; align-items:center;}
@@ -392,25 +396,129 @@ function shootVal(kind, i){
   const v = o ? o[i] : null;
   return (v === "" || v == null) ? null : Number(v);
 }
-function shootTop4(){
+/* ===== 晉級與加賽判定（board.html / staff.html / index.html 共用同一套規則） =====
+   欄位：p=預賽得分、t=預賽加賽得分、f=決賽得分、ft=決賽加賽得分
+   規則：
+   1. 預賽全部登記完，才會產生正式晉級名單；未登記完只顯示灰色「暫定」。
+   2. 第 4 名同分不再用名冊順序硬分，改由同分者登記「加賽得分」決定。
+      加賽若又同分，把加賽得分清掉重填下一輪即可，看板會持續提示 → 等於可以比到分出為止。
+   3. 決賽冠亞季同分同樣用「決賽加賽」分出（第 4 名同分不影響頒獎，直接並列）。 */
+const SHOOT_QUOTA = 4;                       // 預賽取前 4 名進總決賽
+function shootDoneCount() {
+  let n = 0;
+  SHOOTERS.forEach((p, i) => { if (shootVal("p", i) !== null) n++; });
+  return n;
+}
+function shootPrelimComplete() { return shootDoneCount() >= SHOOTERS.length; }
+/* 預賽依得分分群（同分為一群），分數由高到低：[{v, ids:[選手index]}] */
+function shootGroups() {
   const arr = [];
   SHOOTERS.forEach((p, i) => { const v = shootVal("p", i); if (v !== null) arr.push({ i:i, v:v }); });
   arr.sort((a, b) => b.v - a.v || a.i - b.i);
-  return arr.slice(0, 4);
+  const gs = [];
+  arr.forEach(x => {
+    const g = gs[gs.length - 1];
+    if (g && g.v === x.v) g.ids.push(x.i); else gs.push({ v:x.v, ids:[x.i] });
+  });
+  return gs;
 }
-function shootTieNote(){
-  const arr = [];
-  SHOOTERS.forEach((p, i) => { const v = shootVal("p", i); if (v !== null) arr.push(v); });
-  if (arr.length < 5) return "";
-  arr.sort((a, b) => b - a);
-  return arr[3] === arr[4] ? "⚠ 第 4 名同分，現場加賽決定晉級者" : "";
+/* 晉級判定
+   { list:晉級者index[]（未登記完時為暫定領先）, locked:是否已定案, complete:預賽是否登記完,
+     ranks:{index:名次}, tieIds:卡在最後名額待加賽者[], tieNeed:這群人要搶幾個名額, tieAgain:加賽後仍同分 } */
+function shootQualify() {
+  const gs = shootGroups();
+  const ranks = {};
+  let pos = 1;
+  gs.forEach(g => { g.ids.forEach(i => { ranks[i] = pos; }); pos += g.ids.length; });
+  const out = { list:[], locked:false, complete:shootPrelimComplete(), ranks:ranks, tieIds:[], tieNeed:0, tieAgain:false };
+  let need = SHOOT_QUOTA, gi = 0;
+  while (gi < gs.length && need > 0 && gs[gi].ids.length <= need) {
+    gs[gi].ids.forEach(i => out.list.push(i));
+    need -= gs[gi].ids.length;
+    gi++;
+  }
+  if (!out.complete) {                                   // 預賽還沒登記完 → 只給暫定領先，不鎖定
+    if (need > 0 && gi < gs.length) gs[gi].ids.slice(0, need).forEach(i => out.list.push(i));
+    return out;
+  }
+  if (need <= 0 || gi >= gs.length) { out.locked = true; return out; }   // 剛好取滿，或報名人數不足 4 人
+  const tie = gs[gi];                                    // 卡在最後名額的同分群
+  const tv = tie.ids.map(i => ({ i:i, t:shootVal("t", i) }));
+  if (tv.some(x => x.t === null)) {                      // 還有人沒登記加賽得分
+    out.tieIds = tie.ids.slice(); out.tieNeed = need; return out;
+  }
+  tv.sort((a, b) => b.t - a.t);
+  if (tv[need - 1].t === tv[need].t) {                   // 加賽又同分 → 再比一次
+    out.tieIds = tie.ids.slice(); out.tieNeed = need; out.tieAgain = true; return out;
+  }
+  tv.slice(0, need).forEach(x => out.list.push(x.i));
+  out.locked = true;
+  return out;
 }
-function shootRank(finalOnly){
-  const top = shootTop4();
-  const arr = top.map(t => ({ i:t.i, p:t.v, f:shootVal("f", t.i) })).filter(x => !finalOnly || x.f !== null);
-  arr.sort((a, b) => (b.f || 0) - (a.f || 0) || b.p - a.p || a.i - b.i);
-  if (finalOnly && (arr.length < top.length || top.length < 4)) return [];
-  return arr;
+/* 沿用舊介面：回傳晉級（或暫定領先）名單 [{i, v}] */
+function shootTop4() { const q = shootQualify(); return q.list.map(i => ({ i:i, v:shootVal("p", i) })); }
+/* 名單太長時只列前 8 位，避免看板被一長串名字塞爆 */
+function shootNameList(ids) {
+  const ns = ids.map(i => SHOOTERS[i][1]);
+  return ns.length > 8 ? ns.slice(0, 8).join("、") + " …等 " + ns.length + " 人" : ns.join("、");
+}
+function shootTieNote() {
+  const q = shootQualify();
+  if (!q.complete) {
+    const n = shootDoneCount();
+    return n ? "預賽登記中（" + n + "/" + SHOOTERS.length + " 人）：全部登記完才會產生正式晉級名單，未到場者請直接填 0 分" : "";
+  }
+  if (!q.tieIds.length) return "";
+  return (q.tieAgain ? "⚠ 加賽仍同分，請再加賽一次（把加賽得分清掉重填）：" :
+                       "⚠ 並列第 " + (q.list.length + 1) + " 名，請現場加賽並登記「加賽得分」：") +
+         shootNameList(q.tieIds) + "（" + q.tieIds.length + " 人爭 " + q.tieNeed + " 個名額）";
+}
+/* 總決賽名次：依決賽得分排序；同分且涉及冠亞季 → 用「決賽加賽」分出，比到分出為止
+   { rows:[{i,p,f,ft,rank,tie}], settled:名次全部定案, tieIds:待加賽者, tieAgain:加賽後仍同分 } */
+function shootFinalInfo() {
+  const q = shootQualify();
+  const empty = { rows:[], settled:false, tieIds:[], tieAgain:false, qualify:q };
+  if (!q.locked || q.list.length < SHOOT_QUOTA) return empty;
+  const arr = q.list.map(i => ({ i:i, p:shootVal("p", i), f:shootVal("f", i), ft:shootVal("ft", i) }));
+  if (arr.some(x => x.f === null)) return empty;         // 決賽分數還沒登記完
+  arr.sort((a, b) => b.f - a.f);
+  const gs = [];
+  arr.forEach(x => {
+    const g = gs[gs.length - 1];
+    if (g && g.f === x.f) g.ids.push(x); else gs.push({ f:x.f, ids:[x] });
+  });
+  const rows = [], tieIds = [];
+  let pos = 1, tieAgain = false;
+  gs.forEach(g => {
+    if (g.ids.length === 1) { g.ids[0].rank = pos; rows.push(g.ids[0]); pos++; return; }
+    if (pos > 3) {                                       // 第 4 名之後同分不影響頒獎 → 直接並列
+      g.ids.forEach(x => { x.rank = pos; x.tie = true; rows.push(x); });
+      pos += g.ids.length; return;
+    }
+    if (g.ids.every(x => x.ft !== null)) {               // 加賽得分都填了 → 看能不能分出
+      const s = g.ids.slice().sort((a, b) => b.ft - a.ft);
+      let dup = false;
+      for (let k = 1; k < s.length; k++) if (s[k].ft === s[k - 1].ft) dup = true;
+      if (!dup) { s.forEach(x => { x.rank = pos; rows.push(x); pos++; }); return; }
+      tieAgain = true;
+    }
+    g.ids.forEach(x => { x.rank = pos; x.tie = true; rows.push(x); tieIds.push(x.i); });
+    pos += g.ids.length;
+  });
+  return { rows:rows, settled:tieIds.length === 0, tieIds:tieIds, tieAgain:tieAgain, qualify:q };
+}
+function shootFinalTieNote() {
+  const fi = shootFinalInfo();
+  if (!fi.rows.length || fi.settled || !fi.tieIds.length) return "";
+  return (fi.tieAgain ? "⚠ 決賽加賽仍同分，請再加賽一次（把加賽得分清掉重填）：" :
+                        "⚠ 決賽同分，請加賽決定名次並登記「加賽」得分：") + shootNameList(fi.tieIds);
+}
+/* 沿用舊介面：finalOnly=true 時，名次未全部定案就回傳空陣列（冠亞季只在定案後才公布） */
+function shootRank(finalOnly) {
+  const fi = shootFinalInfo();
+  if (!fi.rows.length) return [];
+  if (finalOnly && !fi.settled) return [];
+  return fi.rows;
 }
 
 /* ===== 團體趣味競賽（紅白兩隊） ===== */
@@ -486,7 +594,7 @@ function loserOf(m){
 function getTime(m){ return (liveTimes && liveTimes[m.id]) || m.t; }
 
 /* 版號：與主控版 main_pc.html 同步遞增 */
-const APP_VER = "3.57.5";
+const APP_VER = "3.57.7";
 
 /* 手機版是否顯示裁判（true = 進行中／下一場才顯示；需主控端已同步 event2026/refs） */
 const SHOW_REFS = true;
@@ -671,41 +779,76 @@ function renderSchedule(){
 }
 
 function renderShootPage(){
-  const top = shootTop4();
-  const topRank = {}; top.forEach((t, k) => { topRank[t.i] = k + 1; });
-  const ranked = shootRank(true);
+  const q = shootQualify();
+  const fi = shootFinalInfo();
+  const pos = {}; q.list.forEach((i, k) => { pos[i] = k + 1; });
+  const tieSet = {}; q.tieIds.forEach(i => { tieSet[i] = 1; });
+  const finTie = {}; fi.tieIds.forEach(i => { finTie[i] = 1; });
   const medals = ["🏆 冠軍", "🥈 亞軍", "🥉 季軍", "第 4 名"];
-  let doneN = 0;
-  SHOOTERS.forEach((p, i) => { if (shootVal("p", i) !== null) doneN++; });
+  const doneN = shootDoneCount();
 
   let html = '<div class="round" style="position:static">★ 總決賽（預賽前 4 名）<span class="n">14:50-15:00　籃球場</span></div>';
-  if (!top.length) {
+  if (!doneN) {
     html += '<div class="empty" style="padding:24px 12px">尚未產生晉級者（預賽成績登記中）</div>';
+  } else if (!q.complete) {
+    html += '<div class="empty" style="padding:16px 12px">預賽登記中（' + doneN + '/' + SHOOTERS.length +
+            ' 人）<br><span style="font-size:12.5px">全部登記完才會產生正式晉級名單，以下為暫定領先</span></div>';
+    q.list.forEach((idx, k) => {
+      html += '<div class="card bb done">' +
+        '<div class="row1"><span class="tag">暫定 ' + (k + 1) + '</span></div>' +
+        '<div class="vs"><span class="vsnames">' + esc(SHOOTERS[idx][1]) + '</span>' +
+          '<span class="scorebadge">' + shootVal("p", idx) + '</span></div>' +
+        '<div class="foot">單位 ' + esc(SHOOTERS[idx][2]) + '　｜　預賽得分</div>' +
+      '</div>';
+    });
   } else {
-    const order = ranked.length ? ranked.map(x => x.i) : top.map(x => x.i);
+    // 已確定晉級者 → 顯示決賽名次／決賽得分
+    const order = fi.rows.length ? fi.rows.map(x => x.i) : q.list.slice();
     order.forEach(idx => {
-      const t = top.find(x => x.i === idx);
-      const f = shootVal("f", idx);
-      const r = ranked.length ? ranked.findIndex(x => x.i === idx) : -1;
-      html += '<div class="card bb' + (r === 0 ? " live" : "") + '">' +
-        '<div class="row1"><span class="tag">' + (r >= 0 ? medals[r] : "晉級 " + topRank[idx]) + '</span></div>' +
+      const row = fi.rows.length ? fi.rows.find(x => x.i === idx) : null;
+      const r = row ? row.rank : 0;
+      const isTie = !!(row && row.tie);
+      const f = shootVal("f", idx), ft = shootVal("ft", idx);
+      const label = r ? (isTie ? "並列 " + r : medals[r - 1]) : "晉級 " + pos[idx];
+      html += '<div class="card bb' + (r === 1 && !isTie ? " live" : "") + '">' +
+        '<div class="row1"><span class="tag">' + label + '</span></div>' +
         '<div class="vs"><span class="vsnames">' + esc(SHOOTERS[idx][1]) + '</span>' +
           '<span class="scorebadge">' + (f === null ? "—" : f) + '</span></div>' +
-        '<div class="foot">單位 ' + esc(SHOOTERS[idx][2]) + '　｜　預賽 ' + t.v + ' 分</div>' +
+        '<div class="foot">單位 ' + esc(SHOOTERS[idx][2]) + '　｜　預賽 ' + shootVal("p", idx) + ' 分' +
+          (ft !== null ? '　｜　決賽加賽 ' + ft + ' 分' : "") + '</div>' +
+      '</div>';
+    });
+    // 還在等加賽的並列者
+    q.tieIds.forEach(idx => {
+      html += '<div class="card bb">' +
+        '<div class="row1"><span class="tag" style="color:var(--red)">並列第 ' + (q.list.length + 1) + ' 名・待加賽</span></div>' +
+        '<div class="vs"><span class="vsnames">' + esc(SHOOTERS[idx][1]) + '</span>' +
+          '<span class="scorebadge">' + shootVal("p", idx) + '</span></div>' +
+        '<div class="foot">單位 ' + esc(SHOOTERS[idx][2]) + '　｜　預賽得分' +
+          (shootVal("t", idx) !== null ? '　｜　加賽 ' + shootVal("t", idx) + ' 分' : "") + '</div>' +
       '</div>';
     });
   }
+  const fnote = shootFinalTieNote();
+  if (fnote) html += '<div class="foot" style="color:var(--red);font-weight:700;margin-bottom:6px">' + esc(fnote) + '</div>';
   const note = shootTieNote();
-  if (note) html += '<div class="foot" style="color:var(--red);font-weight:700;margin-bottom:6px">' + note + '</div>';
+  if (note) html += '<div class="foot" style="color:' + (q.complete ? "var(--red)" : "var(--sub)") + ';font-weight:700;margin-bottom:6px">' + esc(note) + '</div>';
 
   html += '<div class="round" style="position:static">預賽成績<span class="n">11:30-13:20　已登記 ' + doneN + '/' + SHOOTERS.length + ' 人</span></div>';
-  const rows = SHOOTERS.map((p, i) => ({ p:p, i:i, v:shootVal("p", i) }))
-    .sort((a, b) => (b.v === null) - (a.v === null) || (b.v - a.v) || a.i - b.i);
+  const rows = SHOOTERS.map((p, i) => ({ p:p, i:i, v:shootVal("p", i), t:shootVal("t", i) }))
+    // 已登記的排前面（原本寫反了，變成未登記的排最上面），再依得分高到低
+    .sort((a, b) => (a.v === null) - (b.v === null) || (b.v - a.v) || a.i - b.i);
   rows.forEach(r => {
-    html += '<div class="shrow' + (topRank[r.i] ? " qual" : "") + '">' +
+    const qualified = q.locked && pos[r.i];
+    const inTie = !!tieSet[r.i];
+    const tag = qualified ? '<span class="shtag">晉級 ' + pos[r.i] + '</span>'
+      : inTie ? '<span class="shtag tie">並列・待加賽</span>'
+      : (!q.complete && pos[r.i]) ? '<span class="shtag pend">暫定 ' + pos[r.i] + '</span>' : "";
+    html += '<div class="shrow' + (qualified ? " qual" : inTie ? " tierow" : "") + '">' +
       '<span class="sheid">' + esc(r.p[0]) + '</span>' +
-      '<span class="shname">' + esc(r.p[1]) + '<span class="shunit">' + esc(r.p[2]) + '</span></span>' +
-      (topRank[r.i] ? '<span class="shtag">晉級 ' + topRank[r.i] + '</span>' : "") +
+      '<span class="shname">' + esc(r.p[1]) + '<span class="shunit">' + esc(r.p[2]) +
+        (r.t !== null ? '　加賽 ' + r.t + ' 分' : "") + '</span></span>' +
+      tag +
       '<span class="shsc">' + (r.v === null ? "—" : r.v) + '</span>' +
     '</div>';
   });
