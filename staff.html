@@ -420,7 +420,7 @@ function searchKeysOf(text){
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function fmtHM(min){ const h = Math.floor(min/60), m = min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); }
 /* 版號：與 index.html、board.html 同步遞增 */
-const APP_VER = "3.57.7";
+const APP_VER = "3.57.13";
 
 const SPORT_LABEL = { tt:"桌球", bad:"羽球", bb:"籃球" };
 const VENUE_LABEL = { "桌1":"🏓 桌1", "桌2":"🏓 桌2", "桌3":"🏓 桌3", "A面":"🏸 羽球A面", "B面":"🏸 羽球B面", "籃球場":"🏀 籃球場" };
