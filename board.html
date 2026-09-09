@@ -424,6 +424,12 @@
   .sresult .sr1 { font-weight:bold; font-size:14px; }
   .sresult .sr2 { color:var(--muted); font-size:12px; }
   .snone { padding:10px 12px; color:var(--muted); font-size:14px; }
+  /* 搜尋結果的場次狀態徽章 */
+  .sst { margin-left:8px; font-size:11.5px; font-weight:800; padding:1px 7px; border-radius:999px; vertical-align:1px; white-space:nowrap; }
+  .sst.live { background:var(--gold); color:#fff; }
+  .sst.over { background:var(--red); color:#fff; }
+  .sst.next { background:transparent; color:#5b7ba6; border:1.5px solid #a9bdd6; }
+  .sst.done { background:transparent; color:var(--muted); border:1.5px solid var(--line); }
   .found { outline:4px solid var(--gold); outline-offset:2px; transition:outline-color .8s ease; }
   .found.fadeout { outline-color:transparent; }
   /* 表格列（tr）用 outline 在部分瀏覽器只畫上下框 → 改用 inset 陰影補左右 */
@@ -545,7 +551,7 @@
 
 <div id="stage"></div>
 
-<footer id="foot">主辦單位：經貿 X 經采 EWC｜© 2026 EWC · v3.57.2</footer>
+<footer id="foot">主辦單位：經貿 X 經采 EWC｜© 2026 EWC · v3.57.5</footer>
 
 <div id="timeModal" class="tmodal">
   <div class="tbox">
@@ -638,11 +644,17 @@ window.fbPushTimes  = times  => fbWriteFull("event2026/times", times);
 window.fbPushFun    = fun    => fbWrite("event2026/fun", fun);
 window.fbPushShoot  = shoot  => fbWrite("event2026/shoot", shoot);
 /* 「清除全部比分」按鈕會呼叫這個，明確把遠端 scores/fun/shoot 整個清空
-   （一般 save() 用的 fbWrite 是合併式，本地清成 {} 時不會主動清掉遠端，需要這個獨立呼叫） */
+   （一般 save() 用的 fbWrite 是合併式，本地清成 {} 時不會主動清掉遠端，需要這個獨立呼叫）
+   回傳 Promise，讓「恢復預設」可以等雲端真的清乾淨了才 reload（否則 reload 會中斷寫入）。 */
 window.fbResetAll = () => {
-  fbWriteFull("event2026/scores", {});
-  fbWriteFull("event2026/fun", {});
-  fbWriteFull("event2026/shoot", {});
+  const run = () => Promise.all([
+    fbDb.ref("event2026/scores").set({}),
+    fbDb.ref("event2026/fun").set({}),
+    fbDb.ref("event2026/shoot").set({})
+  ]).catch(err => { fbShowError("event2026/(scores|fun|shoot)", err); });
+  if (fbSignedIn) return run();
+  // 還沒匿名登入完成：排進佇列，登入後才送出
+  return new Promise(resolve => fbQueue.push(() => run().then(resolve, resolve)));
 };
 /* 裁判只有主控版會寫入，沒有其他裝置會同時編輯，維持整包覆蓋即可 */
 window.fbPushRefs = refs => fbWriteFull("event2026/refs", refs);
@@ -749,7 +761,11 @@ try {
   const raw = localStorage.getItem(KEY);
   if (raw) { const s = JSON.parse(raw); state = Object.assign(state, s); }
 } catch(e) {}
+/* 正在執行「恢復預設」：從按下確定到 reload 之間，禁止任何人再把資料寫回 localStorage，
+   否則遠端 callback 或自動存版會在重整前又把剛清掉的東西補回來。 */
+let resetting = false;
 function save() {
+  if (resetting) return;
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {}
   if (window.fbPushScores) window.fbPushScores(state.scores);
   if (window.fbPushTimes)  window.fbPushTimes(state.times);
@@ -906,6 +922,7 @@ function mergeRemoteInto(target, remote, isFirstSync) {
   }
 }
 function applyRemoteRender() {
+  if (resetting) return;
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
   if (isEditingScoreField()) { pendingRemoteRender = true; return; }
   pendingRemoteRender = false;
@@ -1801,7 +1818,7 @@ function renderShoot() {
 }
 
 /* ===== 餐點登記（117 份；三種顯示模式） ===== */
-const MEAL_TYPES = ["4. 麥香雞 + DE餐(小薯、麥克雞6塊)", "7. 招牌素飯糰(飲品選填)", "2. 大麥克 + DE餐(小薯、麥克雞6塊)", "5. 麥克雞6塊 + A餐(中薯)", "6. 藜麥沙拉(義式油醋沙拉醬包) + A餐(中薯)", "1. 大麥克 + A餐(中薯)", "3. 麥香雞 + A餐(中薯)", "8. 免"];
+const MEAL_TYPES = ["4. 麥香雞 + (中薯、麥克雞6塊)", "7. 招牌素飯糰(飲品選填)", "2. 大麥克 + (中薯、麥克雞6塊)", "5. 麥克雞6塊 + 中薯", "6. 藜麥沙拉(義式油醋沙拉醬包) + 中薯", "1. 大麥克 + 中薯", "3. 麥香雞 + 中薯", "8. 免"];
 const DRINK_TYPES = ["無糖綠茶(中)(去冰)", "玉米濃湯(小)", "無糖綠茶(中)(冰)", ""];
 /* [序號,分隊,組別,部門,員編,姓名,身份,餐食,餐點index,飲品index,所屬同仁] */
 const MEAL_ROWS = [[1,"大家長","1","CO","002","扈端華","同仁","葷食",0,0,""],[2,"大家長","1","CO","002","張勤玫","配偶","葷食",1,1,"扈端華"],[3,"福委","40","IBB","598","張兆嘉","同仁","葷食",2,0,""],[4,"福委","16","FSB","850","范書維","同仁","葷食",2,2,""],[5,"福委","9","DIB","974","吳彥輝","同仁","葷食",2,2,""],[6,"福委","44","MSB","1016","陳毓升","同仁","葷食",2,2,""],[7,"福委","62","PSB","1020","游椀詒","同仁","葷食",0,1,""],[8,"福委","63","PSB","1027","張逸鴻","同仁","葷食",2,2,""],[9,"福委","64","PSB","1028","洪祥盛","同仁","葷食",2,2,""],[10,"福委","22","FSB","1066","許世展","同仁","葷食",2,2,""],[11,"福委","83","OPM","P025","莫為智","同仁","葷食",2,0,""],[12,"福委","76","FSE","P032","游凱鈞","同仁","葷食",2,2,""],[13,"福委","76","FSE","P032","游承益","子女","葷食",0,2,"游凱鈞"],[14,"福委","84","OPM","P106","許依慧","同仁","葷食",0,0,""],[15,"福委","85","OPM","P124","楊欣瑜","同仁","葷食",2,2,""],[16,"福委","81","FSS","P133","陳俊諺","同仁","葷食",2,2,""],[17,"福委","82","FSS","P134","謝東恩","同仁","葷食",0,2,""],[18,"紅隊","50","PSB","008","左明德","同仁","葷食",2,0,""],[19,"紅隊","48","PSB","009","曾仁坤","同仁","葷食",0,1,""],[20,"紅隊","49","PSB","062","簡任余","同仁","葷食",0,0,""],[21,"紅隊","49","PSB","062","范曉君","配偶","素食",1,0,"簡任余"],[22,"紅隊","49","PSB","062","簡允允","子女","葷食",0,2,"簡任余"],[23,"紅隊","51","PSB","120","黃俊欽","同仁","葷食",2,2,""],[24,"紅隊","52","PSB","121","朱俊綱","同仁","葷食",0,2,""],[25,"紅隊","52","PSB","121","朱家緯","子女","葷食",3,1,"朱俊綱"],[26,"紅隊","53","PSB","154","宋思潔","同仁","葷食",0,1,""],[27,"紅隊","53","PSB","154","朱品蓁","子女","葷食",3,1,"宋思潔"],[28,"紅隊","54","PSB","251","潘姝蘋","同仁","葷食",0,0,""],[29,"紅隊","54","PSB","251","劉佳昇","配偶","葷食",2,0,"潘姝蘋"],[30,"紅隊","54","PSB","251","劉宸允","子女","葷食",4,1,"潘姝蘋"],[31,"紅隊","57","PSB","260","陳軍屏","同仁","葷食",2,2,""],[32,"紅隊","55","PSB","334","黃柏盛","同仁","葷食",2,1,""],[33,"紅隊","35","GAO","595","邱瑋亭","同仁","葷食",0,0,""],[34,"紅隊","35","GAO","595","陳昱任","配偶","葷食",5,2,"邱瑋亭"],[35,"紅隊","35","GAO","595","陳浩哲","子女","葷食",3,1,"邱瑋亭"],[36,"紅隊","56","PSB","597","李曉雲","同仁","葷食",6,2,""],[37,"紅隊","41","MSB","672","許至昊","同仁","葷食",2,2,""],[38,"紅隊","41","MSB","672","李秋賦","配偶","葷食",1,1,"許至昊"],[39,"紅隊","58","PSB","750","蘇進家","同仁","葷食",0,2,""],[40,"紅隊","45","MSB","811","張瑋恬","同仁","葷食",2,1,""],[41,"紅隊","42","MSB","816","張博凱","同仁","葷食",2,2,""],[42,"紅隊","2","CO","818","朱瑋婷","同仁","葷食",0,0,""],[43,"紅隊","2","CO","818","朱翊寧","同住兄弟姊妹","葷食",1,1,"朱瑋婷"],[44,"紅隊","59","PSB","961","楊妤婷","同仁","葷食",2,1,""],[45,"紅隊","46","MSB","971","林千翔","同仁","葷食",0,2,""],[46,"紅隊","46","MSB","971","梁禎芳","配偶","葷食",0,1,"林千翔"],[47,"紅隊","46","MSB","971","林育陞","子女","葷食",3,1,"林千翔"],[48,"紅隊","60","PSB","978","陳崇銘","同仁","葷食",2,1,""],[49,"紅隊","43","MSB","988","李依如","同仁","葷食",2,2,""],[50,"紅隊","61","PSB","1001","林秉賢","同仁","葷食",2,1,""],[51,"紅隊","65","PSB","1037","林宛樺","同仁","葷食",2,0,""],[52,"紅隊","66","PSB","1055","周思蓉","同仁","葷食",0,1,""],[53,"紅隊","67","PSB","1056","楊勝傑","同仁","葷食",2,2,""],[54,"紅隊","4","CO","1061","林靜吟","同仁","葷食",2,0,""],[55,"紅隊","47","MSB","1068","王漢雍","同仁","葷食",2,0,""],[56,"紅隊","3","CO","1072","吳宇宸","同仁","葷食",2,2,""],[57,"紅隊","36","GAO","1073","謝安倪","同仁","葷食",0,2,""],[58,"紅隊","68","PSB","1074","廖子鑫","同仁","葷食",2,1,""],[59,"紅隊","77","FSE","P036","李柏儀","同仁","葷食",5,2,""],[60,"紅隊","77","FSE","P036","凌巧倫","配偶","葷食",6,2,"李柏儀"],[61,"紅隊","77","FSE","P036","李苡澄","子女","葷食",3,1,"李柏儀"],[62,"紅隊","77","FSE","P036","凌苡安","子女","葷食",3,1,"李柏儀"],[63,"紅隊","78","FSE","P118","黃禎宗","同仁","葷食",2,2,""],[64,"紅隊","79","FSE","P147","蘇威諺","同仁","葷食",2,2,""],[65,"紅隊","80","FSE","P151","尤勝弘","同仁","葷食",0,2,""],[66,"白隊","11","CO","021","鍾宜珍","同仁","葷食",2,2,""],[67,"白隊","11","CO","021","洪崇銘","配偶","葷食",0,2,"鍾宜珍"],[68,"白隊","23","FSB","115","麥如君","同仁","葷食",2,1,""],[69,"白隊","23","FSB","115","賴名家","配偶","葷食",2,2,"麥如君"],[70,"白隊","23","FSB","115","賴品瀚","子女","葷食",0,2,"麥如君"],[71,"白隊","12","CO","144","游雅蕙","同仁","葷食",2,2,""],[72,"白隊","39","IBB","213","侯志霖","同仁","葷食",2,2,""],[73,"白隊","24","FSB","267","歐蕙綺","同仁","葷食",4,2,""],[74,"白隊","25","FSB","469","陳孟君","同仁","葷食",0,2,""],[75,"白隊","26","FSB","591","楊明真","同仁","葷食",2,2,""],[76,"白隊","26","FSB","591","鄭帆軒","子女","葷食",6,1,"楊明真"],[77,"白隊","30","FSB","649","林建志","同仁","葷食",2,1,""],[78,"白隊","30","FSB","649","林少睿","子女","葷食",0,1,"林建志"],[79,"白隊","27","FSB","656","李雯萱","同仁","葷食",2,2,""],[80,"白隊","5","DIB","700","王浚懿","同仁","葷食",6,0,""],[81,"白隊","5","DIB","700","王柏叡","子女","葷食",3,1,"王浚懿"],[82,"白隊","5","DIB","700","王柏諺","子女","葷食",3,1,"王浚懿"],[83,"白隊","6","DIB","742","洪東昇","同仁","葷食",2,2,""],[84,"白隊","6","DIB","742","洪若晨","子女","葷食",0,1,"洪東昇"],[85,"白隊","69","GAO","788","郭欣怡","同仁","葷食",2,2,""],[86,"白隊","13","CO","819","陳麗芳","同仁","葷食",2,2,""],[87,"白隊","13","CO","819","党夢熊","配偶","葷食",2,0,"陳麗芳"],[88,"白隊","13","CO","819","党子欣","子女","葷食",2,2,"陳麗芳"],[89,"白隊","28","FSB","836","康晉豪","同仁","葷食",0,2,""],[90,"白隊","7","DIB","843","楊權","同仁","素食",1,1,""],[91,"白隊","70","GAO","900","黃祥焜","同仁","葷食",2,2,""],[92,"白隊","71","GAO","908","林彥成","同仁","葷食",0,2,""],[93,"白隊","72","GAO","912","陳志明","同仁","葷食",0,0,""],[94,"白隊","37","GAO","931","王璟瑜","同仁","葷食",0,1,""],[95,"白隊","73","GAO","935","洪義凱","同仁","葷食",2,1,""],[96,"白隊","73","GAO","935","謝妤婕","配偶","葷食",0,0,"洪義凱"],[97,"白隊","38","GAO","953","鄧起宇","同仁","葷食",2,0,""],[98,"白隊","74","GAO","966","封智翔","同仁","葷食",0,2,""],[99,"白隊","17","FSB","998","張翔","同仁","葷食",2,2,""],[100,"白隊","8","DIB","1012","廖昱甄","同仁","葷食",2,0,""],[101,"白隊","18","FSB","1013","蔡季澄","同仁","葷食",2,2,""],[102,"白隊","31","FSB","1033","張正瑜","同仁","葷食",2,2,""],[103,"白隊","75","GAO","1042","蔡慧娟","同仁","葷食",0,1,""],[104,"白隊","32","FSB","1048","吳東育","同仁","葷食",0,2,""],[105,"白隊","33","FSB","1049","陳立學","同仁","葷食",2,2,""],[106,"白隊","10","DIB","1050","呂婉慈","同仁","葷食",2,2,""],[107,"白隊","10","DIB","1050","林柏宇","配偶","葷食",5,2,"呂婉慈"],[108,"白隊","10","DIB","1050","林琮淵","子女","葷食",6,1,"呂婉慈"],[109,"白隊","10","DIB","1050","林畇杉","子女","葷食",7,3,"呂婉慈"],[110,"白隊","29","FSB","1054","林苡勤","同仁","葷食",0,2,""],[111,"白隊","29","FSB","1054","林苡暄","同住兄弟姊妹","葷食",0,2,"林苡勤"],[112,"白隊","19","FSB","1060","孫秉家","同仁","葷食",0,2,""],[113,"白隊","34","FSB","1062","王聖翔","同仁","葷食",5,2,""],[114,"白隊","20","FSB","1063","吳治寰","同仁","葷食",2,0,""],[115,"白隊","21","FSB","1064","李亭鋒","同仁","葷食",2,2,""],[116,"白隊","14","CO","1069","滕威愷","同仁","葷食",3,1,""],[117,"白隊","15","CO","1070","蘇珮瑄","同仁","葷食",0,2,""]];
@@ -2801,11 +2818,29 @@ document.getElementById("setDefBtn").onclick = () => {
   saveToastTimer = setTimeout(() => { msg.classList.remove("show"); }, 1500);
 };
 document.getElementById("resetAllBtn").onclick = () => {
-  if (!confirm("恢復預設：將刪除此瀏覽器儲存的所有資料（比分、裁判、時間異動、輪播與縮放設定）以及全部自動存版，回到預設值（若曾按「設為預設」則回到該版）。確定？\n\n（若不確定請先執行匯出備份）")) return;
-  state.dirty = false; // 避免關頁提醒
-  try { localStorage.removeItem(KEY); } catch(e) {}
-  try { localStorage.removeItem(SNAP_KEY); } catch(e) {}   // 一併清除自動存版
-  location.reload();
+  if (!confirm("恢復預設：將刪除此瀏覽器儲存的所有資料（比分、裁判、時間異動、輪播與縮放設定）以及全部自動存版，回到預設值（若曾按「設為預設」則回到該版）。\n\n⚠ 同時會清空雲端資料庫的比分、趣味競賽與投籃分數，所有手機（含工作人員計分頁）都會一起歸零，此動作無法復原。\n\n確定？（若不確定請先執行匯出備份）")) return;
+
+  resetting = true;      // 從這一刻起，禁止任何路徑再寫回 localStorage
+  state.dirty = false;   // 避免關頁提醒
+
+  const btn = document.getElementById("resetAllBtn");
+  btn.disabled = true;
+  btn.textContent = "清除中…";
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    try { localStorage.removeItem(KEY); } catch(e) {}
+    try { localStorage.removeItem(SNAP_KEY); } catch(e) {}   // 一併清除自動存版
+    location.reload();
+  };
+
+  // 等雲端真的清完才重整；離線或未登入時最多等 5 秒，仍會完成本機重置
+  try {
+    Promise.resolve(window.fbResetAll ? window.fbResetAll() : null).then(finish, finish);
+  } catch (e) { finish(); }
+  setTimeout(finish, 5000);
 };
 document.getElementById("expBtn").onclick = () => {
   state.dirty = false; save();
@@ -2877,6 +2912,10 @@ function doSearch(q) {
   if (!q) { searchResults.style.display = "none"; searchResults.innerHTML = ""; return; }
   const out = [];
   const mealOnly = state.tab === "meal";
+  // 場次狀態（進行中／下一場／完賽）：與對戰圖、賽程總表共用同一套規則，整批只算一次
+  const _now = new Date();
+  const _nowMin = _now.getHours() * 60 + _now.getMinutes();
+  const _ln = computeLiveNext(_nowMin);
   if (!mealOnly) Object.keys(MATCHES).forEach(k => {
     const m = MATCHES[k];
     const A = resolveEntrant(m.a).name || "", B = resolveEntrant(m.b).name || "";
@@ -2886,7 +2925,15 @@ function doSearch(q) {
     if ((ref + idHints(ref)).toLowerCase().indexOf(q) >= 0) roles.push("裁判");
     if (m.lb.toLowerCase().indexOf(q) >= 0) roles.push("場次");
     if (roles.length) {
-      out.push({ go:"m:" + m.id,
+      let st = "", stc = "";
+      if (winnerOf(m)) { st = "完賽"; stc = "done"; }
+      else if (_ln.liveIds[m.id]) {
+        const _r = _ln.liveIds[m.id];
+        const _over = _r && _nowMin > _r.b;
+        st = _over ? "進行中！" : "進行中"; stc = _over ? "over" : "live";
+      }
+      else if (_ln.nextIds[m.id]) { st = "下一場"; stc = "next"; }
+      out.push({ go:"m:" + m.id, st:st, stc:stc,
         t1: SPORT_ICON[m.sport] + " " + groupNameOf(m.group) + "　" + m.lb + "　" + getTime(m) + (m.v ? "（" + m.v + "）" : ""),
         t2: A + " vs " + B + (ref ? "｜裁判：" + ref : "") + "｜" + roles.join("、") });
     }
@@ -2913,7 +2960,9 @@ function doSearch(q) {
   if (!out.length) { searchResults.innerHTML = '<div class="snone">找不到「' + esc(q) + '」相關結果</div>'; }
   else {
     searchResults.innerHTML = out.slice(0, 30).map(r =>
-      '<div class="sresult" data-go="' + r.go + '"><div class="sr1">' + esc(r.t1) + '</div><div class="sr2">' + esc(r.t2) + "</div></div>").join("") +
+      '<div class="sresult" data-go="' + r.go + '"><div class="sr1">' + esc(r.t1) +
+      (r.st ? '<span class="sst ' + r.stc + '">' + esc(r.st) + '</span>' : "") +
+      '</div><div class="sr2">' + esc(r.t2) + "</div></div>").join("") +
       (out.length > 30 ? '<div class="snone">…共 ' + out.length + ' 筆，僅顯示前 30 筆</div>' : "");
   }
   searchResults.style.display = "block";
@@ -3033,6 +3082,7 @@ function loadSnaps() {
 }
 function saveSnaps(a) { try { localStorage.setItem(SNAP_KEY, JSON.stringify(a)); } catch (e) {} }
 function snapshotNow(manual) {
+  if (resetting) return false;
   const arr = loadSnaps();
   const d = new Date();
   const p = n => String(n).padStart(2, "0");

@@ -8,6 +8,10 @@
   :root{
     --paper:#faf8f3; --card:#ffffff; --ink:#2a2f38; --sub:#7c8390; --line:#e7e2d6;
     --tt:#f76707; --bad:#2f9e44; --bb:#c2402a; --gold:#c8951f; --red:#c0392b; --white-team:#4a6076;
+    /* 各賽事分組色：同一運動用同色系，深淺／冷暖區隔，方便現場一眼分辨 */
+    --g-tm:#f76707; --g-tw:#d6336c;                    /* 桌球：男單橘、女單桃紅（避免與籃球磚紅混淆） */
+    --g-bm:#2f9e44; --g-bw:#0ca678; --g-bx:#74b816;    /* 羽球：男雙綠、女雙青綠、混雙黃綠 */
+    --g-bb:#c2402a;                                    /* 籃球 */
     --ok:#2f9e44;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -48,8 +52,8 @@
   .navtab.active{color:var(--ink); border-bottom-color:var(--gold);}
 
   .searchrow{padding:10px 16px 0;}
-  #q{width:100%; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:15px; font-family:inherit;}
-  #q:focus{outline:none; border-color:var(--gold);}
+  #q, #sq{width:100%; border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:15px; font-family:inherit;}
+  #q:focus, #sq:focus{outline:none; border-color:var(--gold);}
   .chips{display:flex; gap:8px; padding:10px 16px 12px; overflow-x:auto;}
   .chip{flex:none; font-size:13.5px; font-weight:700; padding:7px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--card); color:var(--sub); white-space:nowrap;}
   .chip.active{color:#fff; border-color:transparent;}
@@ -57,21 +61,42 @@
   .chip[data-s="tt"].active{background:var(--tt);}
   .chip[data-s="bad"].active{background:var(--bad);}
   .chip[data-s="bb"].active{background:var(--bb);}
+  .chip[data-s="live"]{color:var(--gold); border-color:#e6d6a8;}
+  .chip[data-s="live"].active{background:var(--gold); color:#fff;}
+  .chip[data-s="next"]{color:#5b7ba6; border-color:#cfd8e3;}
+  .chip[data-s="next"].active{background:#5b7ba6; color:#fff;}
+  #shootChips .chip.active{background:#3a4250;}
+  #shootChips .chip[data-sf="top4"]{color:var(--gold); border-color:#e6d6a8;}
+  #shootChips .chip[data-sf="top4"].active{background:var(--gold); color:#fff; border-color:transparent;}
+  .chip .cnt{margin-left:5px; font-size:11.5px; opacity:.75; font-variant-numeric:tabular-nums;}
 
   main{padding:4px 16px 0;}
   .empty{text-align:center; color:var(--sub); padding:40px 20px; font-size:14px;}
   .updated{text-align:center; color:var(--sub); font-size:11.5px; padding:16px 0 4px;}
+  .verline{text-align:center; color:var(--sub); font-size:10.5px; padding:0 0 16px; opacity:.75;}
 
   .card{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:10px;}
   .card.tt{border-left-color:var(--tt);}
   .card.bad{border-left-color:var(--bad);}
   .card.bb{border-left-color:var(--bb);}
+  .card.g-tm{border-left-color:var(--g-tm);}
+  .card.g-tw{border-left-color:var(--g-tw);}
+  .card.g-bm{border-left-color:var(--g-bm);}
+  .card.g-bw{border-left-color:var(--g-bw);}
+  .card.g-bx{border-left-color:var(--g-bx);}
+  .card.g-bb{border-left-color:var(--g-bb);}
   .card.qual{border-left-color:var(--gold);}
   .ctop{font-size:12px; font-weight:700; color:var(--sub); display:flex; justify-content:space-between; align-items:baseline; gap:6px;}
   .ctop .tag{font-weight:700;}
   .card.tt .ctop .tag{color:var(--tt);}
   .card.bad .ctop .tag{color:var(--bad);}
   .card.bb .ctop .tag{color:var(--bb);}
+  .card.g-tm .ctop .tag{color:var(--g-tm);}
+  .card.g-tw .ctop .tag{color:var(--g-tw);}
+  .card.g-bm .ctop .tag{color:var(--g-bm);}
+  .card.g-bw .ctop .tag{color:var(--g-bw);}
+  .card.g-bx .ctop .tag{color:var(--g-bx);}
+  .card.g-bb .ctop .tag{color:var(--g-bb);}
   .cvenue{font-size:11px; color:var(--sub); margin-top:1px;}
 
   .scorerow{display:flex; align-items:center; justify-content:space-between; padding:9px 0 2px; gap:8px;}
@@ -96,6 +121,23 @@
   .savedtag{font-size:11px; color:var(--ok); font-weight:700;}
 
   .qualtag{font-size:10.5px; background:var(--gold); color:#fff; border-radius:6px; padding:1px 6px; margin-left:4px;}
+
+  /* 裁判姓名加粗，讓現場工作人員一眼看到自己是不是這場的裁判 */
+  .cvenue b{color:var(--ink); font-weight:800;}
+
+  /* 勝者獎盃：名字太長時只截斷名字，獎盃永遠看得到 */
+  .scorerow .pname{display:flex; align-items:center; gap:3px; overflow:visible;}
+  .pntxt{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pnwin{flex:none;}
+  .fwin{flex:none; color:var(--gold); font-weight:800; white-space:nowrap; font-size:13px;}
+
+  /* 進行中／下一場 */
+  .card.live{background:#fffdf2; border-top-color:#f0d98a; border-right-color:#f0d98a; border-bottom-color:#f0d98a;}
+  .card.next{border-top-style:dashed; border-right-style:dashed; border-bottom-style:dashed;}
+  .phasetag{font-size:11px; font-weight:800; white-space:nowrap;}
+  .phasetag.live{color:var(--gold);}
+  .phasetag.live.over{color:var(--red);}
+  .phasetag.next{color:#5b7ba6;}
 </style>
 </head>
 <body>
@@ -120,8 +162,10 @@
 </div>
 
 <div id="scheduleControls">
-  <div class="searchrow"><input id="q" placeholder="搜尋姓名／賽事"></div>
+  <div class="searchrow"><input id="q" placeholder="搜尋姓名／英文名／員編"></div>
   <div class="chips" id="chips">
+    <div class="chip" data-s="live">● 進行中</div>
+    <div class="chip" data-s="next">○ 下一場</div>
     <div class="chip active" data-s="all">全部</div>
     <div class="chip" data-s="tt">🏓 桌球</div>
     <div class="chip" data-s="bad">🏸 羽球</div>
@@ -129,8 +173,17 @@
   </div>
 </div>
 
+<div id="shootControls" style="display:none">
+  <div class="searchrow"><input id="sq" placeholder="搜尋姓名／英文名／員編"></div>
+  <div class="chips" id="shootChips">
+    <div class="chip active" data-sf="all">全部</div>
+    <div class="chip" data-sf="top4">🏆 前 4 名</div>
+  </div>
+</div>
+
 <main id="main"></main>
 <div class="updated" id="updated"></div>
+<div class="verline" id="verline"></div>
 <div id="debugBanner" style="display:none; margin:10px 16px; padding:10px 12px; background:#fdecea; border:1px solid #f2b8b5; color:#8a1f11; font-size:12px; border-radius:8px; word-break:break-all;"></div>
 
 <script>
@@ -203,7 +256,7 @@ function pushLeaf(path, value){
   if (fbSignedIn) run(); else fbQueue.push(run);
 }
 
-let liveScores = {}, liveFun = {}, liveShoot = {}, liveRefs = {};
+let liveScores = {}, liveFun = {}, liveShoot = {}, liveRefs = {}, liveTimes = {};
 /* 記錄「這台裝置剛剛自己改過」的欄位，短時間內不要被剛好慢到的遠端回傳蓋掉，避免畫面閃爍/跳回舊值 */
 const recentEdit = {};
 function markRecent(key){ recentEdit[key] = Date.now() + 1500; }
@@ -232,6 +285,11 @@ fbDb.ref("event2026/shoot").on("value", snap => {
 /* 裁判資料：只讀顯示，這份檔案沒有任何寫入 event2026/refs 的程式碼，工作人員無法在這裡改裁判 */
 fbDb.ref("event2026/refs").on("value", snap => {
   liveRefs = snap.val() || {};
+  render();
+}, () => {});
+/* 比賽時間異動：只讀。主控台若把某場往後延，這裡的「進行中／下一場」才會跟著正確 */
+fbDb.ref("event2026/times").on("value", snap => {
+  liveTimes = snap.val() || {};
   render();
 }, () => {});
 
@@ -336,8 +394,25 @@ const SHOOTERS = [
   ["P147","蘇威諺(Ziv)","FSE·FCMA"]
 ];
 
+/* 姓名 → 員編／部門／英文名（供搜尋比對，不影響畫面顯示；資料與主控版餐點名冊一致） */
+const NAME_KEYS = {"扈端華":"002 CO Daniel","張勤玫":"002 CO","張兆嘉":"598 IBB Cindy","范書維":"850 FSB Derek","吳彥輝":"974 DIB Nick","陳毓升":"1016 MSB Sam","游椀詒":"1020 PSB Wynne","張逸鴻":"1027 PSB Ethan","洪祥盛":"1028 PSB Joshua","許世展":"1066 FSB Ian","莫為智":"P025 OPM Eric","游凱鈞":"P032 FSE Matrix","游承益":"P032 FSE","許依慧":"P106 OPM Wendy","楊欣瑜":"P124 OPM Tina","陳俊諺":"P133 FSS Ivor","謝東恩":"P134 FSS Bryan","左明德":"008 PSB MT","曾仁坤":"009 PSB James","簡任余":"062 PSB Jerry","范曉君":"062 PSB","簡允允":"062 PSB","黃俊欽":"120 PSB ChunChin","朱俊綱":"121 PSB Stanley","朱家緯":"121 PSB","宋思潔":"154 PSB Suzie","朱品蓁":"154 PSB","潘姝蘋":"251 PSB Apple","劉佳昇":"251 PSB","劉宸允":"251 PSB","陳軍屏":"260 PSB Tommy","黃柏盛":"334 PSB Benson","邱瑋亭":"595 GAO Stella","陳昱任":"595 GAO","陳浩哲":"595 GAO","李曉雲":"597 PSB Wennie","許至昊":"672 MSB Gershwin","李秋賦":"672 MSB","蘇進家":"750 PSB Josh","張瑋恬":"811 MSB Amy","張博凱":"816 MSB Kenny","朱瑋婷":"818 CO Weiting","朱翊寧":"818 CO","楊妤婷":"961 PSB Tina","林千翔":"971 MSB Coco","梁禎芳":"971 MSB","林育陞":"971 MSB","陳崇銘":"978 PSB Tom","李依如":"988 MSB Janice","林秉賢":"1001 PSB Adam","林宛樺":"1037 PSB Lena","周思蓉":"1055 PSB Zoey","楊勝傑":"1056 PSB Allen","林靜吟":"1061 CO Emily","王漢雍":"1068 MSB Mario","吳宇宸":"1072 CO Leo","謝安倪":"1073 GAO Annie","廖子鑫":"1074 PSB Jason","李柏儀":"P036 FSE Eric","凌巧倫":"P036 FSE","李苡澄":"P036 FSE","凌苡安":"P036 FSE","黃禎宗":"P118 FSE Zong","蘇威諺":"P147 FSE Ziv","尤勝弘":"P151 FSE Harries","鍾宜珍":"021 CO Selena","洪崇銘":"021 CO","麥如君":"115 FSB Amy","賴名家":"115 FSB","賴品瀚":"115 FSB","游雅蕙":"144 CO Grace","侯志霖":"213 IBB Oliver","歐蕙綺":"267 FSB Ciara","陳孟君":"469 FSB Jun","楊明真":"591 FSB Minjane","鄭帆軒":"591 FSB","林建志":"649 FSB Kenny","林少睿":"649 FSB","李雯萱":"656 FSB Flora","王浚懿":"700 DIB Frank","王柏叡":"700 DIB","王柏諺":"700 DIB","洪東昇":"742 DIB Keith","洪若晨":"742 DIB","郭欣怡":"788 GAO Teresa","陳麗芳":"819 CO Vivian","党夢熊":"819 CO","党子欣":"819 CO","康晉豪":"836 FSB Brian","楊權":"843 DIB Chorld","黃祥焜":"900 GAO Yellow","林彥成":"908 GAO Nick","陳志明":"912 GAO Raven","王璟瑜":"931 GAO Julie","洪義凱":"935 GAO Wilkai","謝妤婕":"935 GAO","鄧起宇":"953 GAO Richard","封智翔":"966 GAO Vito","張翔":"998 FSB Cliff","廖昱甄":"1012 DIB Nova","蔡季澄":"1013 FSB Joseph","張正瑜":"1033 FSB John","蔡慧娟":"1042 GAO Zoe","吳東育":"1048 FSB Teddy","陳立學":"1049 FSB Lucas","呂婉慈":"1050 DIB Vanessa","林柏宇":"1050 DIB","林琮淵":"1050 DIB","林畇杉":"1050 DIB","林苡勤":"1054 FSB Betty","林苡暄":"1054 FSB","孫秉家":"1060 FSB Jack","王聖翔":"1062 FSB Shuan","吳治寰":"1063 FSB Benson","李亭鋒":"1064 FSB Ryan","滕威愷":"1069 CO Andy","蘇珮瑄":"1070 CO Sherry"};
+const _keysCache = {};
+/* 由「王聖翔(Shuan)/林建志(Kenny)」這類字串取出可搜尋的關鍵字：中文名、英文名、員編、部門 */
+function searchKeysOf(text){
+  if (_keysCache[text] != null) return _keysCache[text];
+  let out = String(text).toLowerCase();
+  String(text).split("/").forEach(part => {
+    const cn = part.replace(/\(.*?\)/g, "").trim();
+    if (cn && NAME_KEYS[cn]) out += " " + NAME_KEYS[cn].toLowerCase();
+  });
+  return (_keysCache[text] = out);
+}
+
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function fmtHM(min){ const h = Math.floor(min/60), m = min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); }
+/* 版號：與 index.html、board.html 同步遞增 */
+const APP_VER = "3.57.5";
+
 const SPORT_LABEL = { tt:"桌球", bad:"羽球", bb:"籃球" };
 const VENUE_LABEL = { "桌1":"🏓 桌1", "桌2":"🏓 桌2", "桌3":"🏓 桌3", "A面":"🏸 羽球A面", "B面":"🏸 羽球B面", "籃球場":"🏀 籃球場" };
 
@@ -389,7 +464,69 @@ function shootTop4(){
   return arr.slice(0, 4);
 }
 
-let state = { view:"schedule", s:"all", q:"" };
+let state = { view:"schedule", s:"all", q:"", sq:"", sf:"all" };
+
+/* ===== 進行中／下一場（規則與主控版 board.html、手機看板 index.html 完全一致） ===== */
+let nowMin = 0;
+const MATCH_LIST = Object.keys(MATCHES).map(k => MATCHES[k]);
+function getTime(m){ return (liveTimes && liveTimes[m.id]) || m.t; }
+function parseRange(t){
+  const x = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/.exec(String(t).trim());
+  return x ? { a:(+x[1])*60+(+x[2]), b:(+x[3])*60+(+x[4]) } : null;
+}
+function isReady(m){
+  return (resolveEntrant(m.a).ok || (m.a && m.a.bye)) && (resolveEntrant(m.b).ok || (m.b && m.b.bye));
+}
+let liveIds = {}, nextIds = {};
+function computeVenueState(){
+  // 每個場地只讓「開賽時間最早」且已開賽、未完賽的一場顯示進行中
+  const liveByVenue = {};
+  MATCH_LIST.forEach(m => {
+    const r = parseRange(getTime(m));
+    if (!r || winnerOf(m) || !isReady(m)) return;
+    if (nowMin < r.a) return;                          // 尚未開賽
+    const v = m.v || "_";
+    const cur = liveByVenue[v];
+    if (!cur || r.a < cur.r.a) liveByVenue[v] = { m:m, r:r };
+  });
+  liveIds = {};
+  Object.keys(liveByVenue).forEach(v => { liveIds[liveByVenue[v].m.id] = liveByVenue[v].r; });
+  // 下一場：同場地中，排在進行中那場之後、時間最早的未完賽場次
+  nextIds = {};
+  Object.keys(liveByVenue).forEach(v => {
+    const cur = liveByVenue[v];
+    let best = null;
+    MATCH_LIST.forEach(m => {
+      if (m.id === cur.m.id || (m.v || "_") !== v) return;
+      const r = parseRange(getTime(m));
+      if (!r || winnerOf(m)) return;
+      if (r.a < cur.r.a) return;                       // 早於進行中那場的不算
+      if (r.a === cur.r.a && m.id <= cur.m.id) return; // 同時段取後者
+      if (!best || r.a < best.r.a) best = { m:m, r:r };
+    });
+    if (best) nextIds[best.m.id] = true;
+  });
+  // 該場地尚無進行中場次時：取該場地最早的未完賽場次為下一場
+  const venues = {};
+  MATCH_LIST.forEach(m => {
+    const v = m.v || "_";
+    if (liveByVenue[v]) return;
+    const r = parseRange(getTime(m));
+    if (!r || winnerOf(m)) return;
+    if (!venues[v] || r.a < venues[v].r.a) venues[v] = { m:m, r:r };
+  });
+  Object.keys(venues).forEach(v => { nextIds[venues[v].m.id] = true; });
+}
+function matchPhase(m){
+  if (liveIds[m.id]) { const r = liveIds[m.id]; return (r && nowMin > r.b) ? "live over" : "live"; }
+  return nextIds[m.id] ? "next" : "";
+}
+/* 選手名稱：勝者名字後面掛獎盃 */
+function pnameHTML(side, winnerText){
+  const isWin = winnerText && side.ok && side.text === winnerText;
+  return '<span class="pname"><span class="pntxt">' + esc(side.text) + '</span>' +
+         (isWin ? '<span class="pnwin">🏆</span>' : "") + '</span>';
+}
 
 /* ===== 共用：數字加減器（可以直接點兩側按鈕，也可以直接點數字輸入） ===== */
 function stepperHTML(kind, key, sub, val){
@@ -401,28 +538,73 @@ function stepperHTML(kind, key, sub, val){
   '</div>';
 }
 
+/* 更新投籃「前 4 名」按鈕上的人數 */
+function updateShootChipCount(){
+  const el = document.querySelector('#shootChips .chip[data-sf="top4"]');
+  if (!el) return;
+  const n = shootTop4().length;
+  el.innerHTML = "🏆 前 4 名" + (n ? '<span class="cnt">' + n + '</span>' : "");
+}
+
+/* 更新「進行中／下一場」按鈕上的場次數量 */
+function updateChipCounts(){
+  let live = 0, next = 0;
+  MATCH_LIST.forEach(m => {
+    if (m.b && m.b.bye) return;
+    if (scoreOf(m.id) !== null) return;
+    const ph = matchPhase(m);
+    if (ph.indexOf("live") === 0) live++;
+    else if (ph === "next") next++;
+  });
+  const set = (sel, n) => {
+    const el = document.querySelector('#chips .chip[data-s="' + sel + '"]');
+    if (!el) return;
+    el.innerHTML = (sel === "live" ? "● 進行中" : "○ 下一場") + (n ? '<span class="cnt">' + n + '</span>' : "");
+  };
+  set("live", live); set("next", next);
+}
+
 /* ===== 賽程比分 ===== */
 function renderSchedule(){
   const q = state.q.trim().toLowerCase();
   const list = Object.keys(MATCHES).map(k => MATCHES[k]).filter(m => !(m.b && m.b.bye));
   const filtered = list.filter(m => {
-    if (state.s !== "all" && m.sport !== state.s) return false;
+    if (state.s === "live" || state.s === "next") {
+      // 已輸入比分的場次不再視為進行中／下一場，與卡片右上角的標示一致
+      if (scoreOf(m.id) !== null) return false;
+      const ph = matchPhase(m);
+      if (state.s === "live" && ph.indexOf("live") !== 0) return false;
+      if (state.s === "next" && ph !== "next") return false;
+    }
+    else if (state.s !== "all" && m.sport !== state.s) return false;
     if (!q) return true;
     const A = resolveEntrant(m.a).text, B = resolveEntrant(m.b).text;
-    return (m.gname + " " + m.lb + " " + A + " " + B).toLowerCase().indexOf(q) >= 0;
+    return ((m.gname + " " + m.lb).toLowerCase() + " " + searchKeysOf(A) + " " + searchKeysOf(B)).indexOf(q) >= 0;
   });
-  if (!filtered.length) return '<div class="empty">找不到符合的場次</div>';
+  if (!filtered.length) {
+    if (state.s === "live") return '<div class="empty">目前沒有進行中的場次<br><span style="font-size:12.5px">賽事還沒開始，或這個時段剛好都輸入完了</span></div>';
+    if (state.s === "next") return '<div class="empty">目前沒有排定的下一場</div>';
+    return '<div class="empty">找不到符合的場次</div>';
+  }
   let html = "";
   filtered.forEach(m => {
     const A = resolveEntrant(m.a), B = resolveEntrant(m.b);
     const s = liveScores[m.id] || {};
     const done = scoreOf(m.id) !== null;
     const ref = liveRefs[m.id] || "";
-    html += '<div class="card ' + m.sport + (done ? " qual" : "") + '">' +
-      '<div class="ctop"><span class="tag">' + SPORT_LABEL[m.sport] + ' · ' + esc(m.gname) + ' ' + esc(m.lb) + '</span>' + (done ? '<span class="savedtag">✓ 已輸入</span>' : "") + '</div>' +
-      '<div class="cvenue">' + (m.t && m.t !== "—" ? esc(m.t) + "　" : "") + (VENUE_LABEL[m.v] || esc(m.v||"")) + (ref ? '　🚩 裁判　' + esc(ref) : "") + '</div>' +
-      '<div class="scorerow"><span class="pname">' + esc(A.text) + '</span>' + stepperHTML("score", m.id, "a", s.a) + '</div>' +
-      '<div class="scorerow"><span class="pname">' + esc(B.text) + '</span>' + stepperHTML("score", m.id, "b", s.b) + '</div>' +
+    const w = winnerOf(m);
+    const t = getTime(m);
+    // 已輸入比分的場次不再標進行中／下一場，右上角改顯示「已輸入」
+    const phase = done ? "" : matchPhase(m);
+    const over = phase.indexOf("over") >= 0;
+    const rightTag = done ? '<span class="savedtag">✓ 已輸入</span>'
+      : phase.indexOf("live") === 0 ? '<span class="phasetag live' + (over ? " over" : "") + '">● 進行中' + (over ? "！" : "") + '</span>'
+      : phase === "next" ? '<span class="phasetag next">○ 下一場</span>' : "";
+    html += '<div class="card ' + m.sport + " g-" + m.group + (done ? " qual" : "") + (phase ? " " + phase : "") + '">' +
+      '<div class="ctop"><span class="tag">' + SPORT_LABEL[m.sport] + ' · ' + esc(m.gname) + ' ' + esc(m.lb) + '</span>' + rightTag + '</div>' +
+      '<div class="cvenue">' + (t && t !== "—" ? esc(t) + "　" : "") + (VENUE_LABEL[m.v] || esc(m.v||"")) + (ref ? '　🚩 裁判　<b>' + esc(ref) + '</b>' : "") + '</div>' +
+      '<div class="scorerow">' + pnameHTML(A, w) + stepperHTML("score", m.id, "a", s.a) + '</div>' +
+      '<div class="scorerow">' + pnameHTML(B, w) + stepperHTML("score", m.id, "b", s.b) + '</div>' +
       '<div class="cardfoot"><span class="clearlink" data-clear="score" data-key="' + m.id + '">清除這場比分</span></div>' +
     '</div>';
   });
@@ -435,10 +617,13 @@ function renderFun(){
   FUN_EVENTS.forEach(e => {
     const f = liveFun[e.id] || {};
     const done = funScore(e.id) !== null;
+    const sc = funScore(e.id);
+    const rw = sc && sc.r > sc.w, ww = sc && sc.w > sc.r;
+    const winTag = '<span class="fwin">（勝）🏆</span>';
     html += '<div class="card' + (done ? " qual" : "") + '">' +
       '<div class="ctop"><span class="tag">' + esc(e.name) + '</span>' + (done ? '<span class="savedtag">✓ 已輸入</span>' : "") + '</div>' +
-      '<div class="scorerow"><span class="pname">🔴 紅隊</span>' + stepperHTML("fun", e.id, "r", f.r) + '</div>' +
-      '<div class="scorerow"><span class="pname">⚪ 白隊</span>' + stepperHTML("fun", e.id, "w", f.w) + '</div>' +
+      '<div class="scorerow"><span class="pname"><span class="pntxt">🔴 紅隊</span>' + (rw ? winTag : "") + '</span>' + stepperHTML("fun", e.id, "r", f.r) + '</div>' +
+      '<div class="scorerow"><span class="pname"><span class="pntxt">⚪ 白隊</span>' + (ww ? winTag : "") + '</span>' + stepperHTML("fun", e.id, "w", f.w) + '</div>' +
       '<div class="cardfoot"><span class="clearlink" data-clear="fun" data-key="' + e.id + '">清除這項比分</span></div>' +
     '</div>';
   });
@@ -449,8 +634,24 @@ function renderFun(){
 function renderShoot(){
   const top = shootTop4();
   const topSet = {}; top.forEach((t, k) => { topSet[t.i] = k + 1; });
+  const sq = state.sq.trim().toLowerCase();
+  // 晉級名次一律以全體 29 人的預賽成績計算，搜尋與篩選只影響「顯示哪幾張卡片」
+  const hits = SHOOTERS.map((p, i) => i).filter(i => {
+    if (state.sf === "top4" && !topSet[i]) return false;
+    if (!sq) return true;
+    const p = SHOOTERS[i];
+    return (p[0] + " " + p[1] + " " + p[2] + " " + searchKeysOf(p[1])).toLowerCase().indexOf(sq) >= 0;
+  });
+  // 只看前 4 名時，改用名次排序（預設是名冊順序，看不出誰第幾名）
+  if (state.sf === "top4") hits.sort((a, b) => topSet[a] - topSet[b]);
   let html = '<div class="empty" style="padding:10px 4px;text-align:left;color:var(--sub);font-size:12.5px">預賽取前 4 名進總決賽；決賽分數只有晉級者需要填。</div>';
-  SHOOTERS.forEach((p, i) => {
+  if (!hits.length) {
+    if (state.sf === "top4" && !top.length) return html + '<div class="empty">尚無預賽成績<br><span style="font-size:12.5px">要先輸入預賽得分，才排得出前 4 名</span></div>';
+    if (state.sf === "top4") return html + '<div class="empty">前 4 名裡找不到符合的選手</div>';
+    return html + '<div class="empty">找不到符合的選手</div>';
+  }
+  hits.forEach(i => {
+    const p = SHOOTERS[i];
     const pv = shootVal("p", i);
     const rk = topSet[i];
     html += '<div class="card' + (rk ? " qual" : "") + '">' +
@@ -464,6 +665,11 @@ function renderShoot(){
 }
 
 function render(){
+  const now = new Date();
+  nowMin = now.getHours() * 60 + now.getMinutes();
+  computeVenueState();
+  updateChipCounts();
+  updateShootChipCount();
   const main = document.getElementById("main");
   if (state.view === "schedule") main.innerHTML = renderSchedule();
   else if (state.view === "fun") main.innerHTML = renderFun();
@@ -471,6 +677,7 @@ function render(){
 
   const statusText = fbStatus === "live" ? "🟢 已連線，比分即時同步" : fbStatus === "offline" ? "🔴 連線中斷，請檢查網路" : "🟡 連線中…";
   document.getElementById("updated").textContent = statusText;
+  document.getElementById("verline").textContent = "經貿 X 經采 EWC　© 2026 EWC · v" + APP_VER;
 }
 
 /* ===== 共用：讀取／寫入某個計分欄位的目前值 ===== */
@@ -561,6 +768,7 @@ document.getElementById("nav").addEventListener("click", ev => {
   t.classList.add("active");
   state.view = t.getAttribute("data-v");
   document.getElementById("scheduleControls").style.display = state.view === "schedule" ? "" : "none";
+  document.getElementById("shootControls").style.display = state.view === "shoot" ? "" : "none";
   render();
 });
 document.getElementById("chips").addEventListener("click", ev => {
@@ -572,6 +780,24 @@ document.getElementById("chips").addEventListener("click", ev => {
   render();
 });
 document.getElementById("q").addEventListener("input", ev => { state.q = ev.target.value; render(); });
+document.getElementById("sq").addEventListener("input", ev => { state.sq = ev.target.value; render(); });
+document.getElementById("shootChips").addEventListener("click", ev => {
+  const c = ev.target.closest(".chip");
+  if (!c) return;
+  document.querySelectorAll("#shootChips .chip").forEach(x => x.classList.remove("active"));
+  c.classList.add("active");
+  state.sf = c.getAttribute("data-sf");
+  render();
+});
+
+/* 每 30 秒重畫一次，讓「進行中／下一場」跟著時間走。
+   有人正在輸入比分（或正在打搜尋關鍵字）時跳過，避免手上的欄位被重繪打斷。 */
+setInterval(() => {
+  if (state.view !== "schedule") return;
+  const el = document.activeElement;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+  render();
+}, 30000);
 
 render();
 </script>
