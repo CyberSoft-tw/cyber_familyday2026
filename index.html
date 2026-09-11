@@ -400,7 +400,7 @@ const GROUPS = [
     {id:"bmp1", t:"10:50-11:00", v:"A面", lb:"資格賽-1", a:P("張翔(Cliff)/孫秉家(Jack)"), b:P("林建志(Kenny)/林少睿")} ]},
   { title:"4強", ms:[
     {id:"bms1", t:"11:10-11:20", v:"B面", lb:"4強-1", a:P("黃祥焜(Yellow)/林彥成(Nick)"), b:W("bmp1")},
-    {id:"bms2", t:"11:30-11:40", v:"A面", lb:"4強-2", a:P("楊權(Chorld)/鄧起宇(Richard)"), b:P("陳志明(Raven)/謝東恩(Bryan)")} ]},
+    {id:"bms2", t:"11:30-11:40", v:"A面", lb:"4強-2", a:P("楊權(Chorld)/鄧起宇(Richard)"), b:P("謝東恩(Bryan)/陳毓升(Sam)")} ]},
   { title:"冠軍賽", ms:[
     {id:"bmf", t:"14:40-14:50", v:"A面", lb:"冠軍賽", star:true, a:W("bms1"), b:W("bms2"), crown:"冠軍"} ]} ]},
 { id:"bw", name:"羽球女雙", sport:"bad", cols:[
@@ -422,7 +422,7 @@ const GROUPS = [
     {id:"bxf", t:"14:50-15:00", v:"A面", lb:"冠軍賽", star:true, a:W("bxs1"), b:W("bxs2"), crown:"冠軍"} ]} ]},
 { id:"bb", name:"籃球3對3", sport:"bb", cols:[
   { title:"資格賽", ms:[
-    {id:"bbp1", t:"11:00-11:10", v:"籃球場", lb:"資格賽-1", a:P("陳志明(Raven)/洪義凱(Wilkai)/鄧起宇(Richard)"), b:P("王漢雍(Mario)/林千翔(Coco)/吳彥輝(Nick)")} ]},
+    {id:"bbp1", t:"11:00-11:10", v:"籃球場", lb:"資格賽-1", a:P("洪義凱(Wilkai)/鄧起宇(Richard)/陳志明(Raven)"), b:P("王漢雍(Mario)/林千翔(Coco)/吳彥輝(Nick)")} ]},
   { title:"4強", ms:[
     {id:"bbs1", t:"11:20-11:30", v:"籃球場", lb:"4強-1", a:P("封智翔(Vito)/蘇威諺(Ziv)/林彥成(Nick)"), b:P("許世展(Ian)/康晉豪(Brian)/范書維(Derek)")},
     {id:"bbs2", t:"11:10-11:20", v:"籃球場", lb:"4強-2", a:P("陳立學(Lucas)/王聖翔(Shuan)/吳宇宸(Leo)"), b:W("bbp1")} ]},
@@ -434,7 +434,7 @@ const GROUPS = [
 const MATCHES = {};
 GROUPS.forEach(g => g.cols.forEach(c => c.ms.forEach(m => { m.group = g.id; m.gname = g.name; m.sport = g.sport; MATCHES[m.id] = m; })));
 
-/* ===== 投籃大賽（29 人；預賽取前 4 名 → 總決賽，資料與主控版一致） ===== */
+/* ===== 投籃大賽（28 人；預賽取前 4 名 → 總決賽，資料與主控版一致） ===== */
 const SHOOTERS = [
   ["002","扈端華(Daniel)","CO"],["1072","吳宇宸(Leo)","CO"],["974","吳彥輝(Nick)","DIB·DMD"],["1050","呂婉慈(Vanessa)","DIB·DMD"],
   ["021","洪崇銘","CO·FAD"],["1069","滕威愷(Andy)","CO·FAD"],["850","范書維(Derek)","FSB·FS1"],["469","陳孟君(Jun)","FSB·FS2"],
@@ -442,7 +442,7 @@ const SHOOTERS = [
   ["1049","陳立學(Lucas)","FSB·FS3"],["1062","王聖翔(Shuan)","FSB·FS3"],["1073","謝安倪(Annie)","GAO·HRD"],["816","張博凱(Kenny)","MSB·MS1"],
   ["811","張瑋恬(Amy)","MSB·MS2"],["971","林千翔(Coco)","MSB·MS2"],["1068","王漢雍(Mario)","MSB·MS2"],["121","朱俊綱(Stanley)","PSB·PS1"],
   ["334","黃柏盛(Benson)","PSB·PS2"],["1028","洪祥盛(Joshua)","PSB·PS3"],["1037","林宛樺(Lena)","PSB·PS3"],["1056","楊勝傑(Allen)","PSB·PS3"],
-  ["1074","廖子鑫(Jason)","PSB·PS3"],["912","陳志明(Raven)","GAO·ITS"],["966","封智翔(Vito)","GAO·ITS"],["P118","黃禎宗(Zong)","FSE·PCMA"],
+  ["1074","廖子鑫(Jason)","PSB·PS3"],["966","封智翔(Vito)","GAO·ITS"],["P118","黃禎宗(Zong)","FSE·PCMA"],
   ["P147","蘇威諺(Ziv)","FSE·FCMA"]
 ];
 function shootVal(kind, i){
@@ -648,7 +648,7 @@ function loserOf(m){
 function getTime(m){ return (liveTimes && liveTimes[m.id]) || m.t; }
 
 /* 版號：與主控版 main_pc.html 同步遞增 */
-const APP_VER = "3.57.13";
+const APP_VER = "3.57.17";
 
 /* 手機版是否顯示裁判（true = 進行中／下一場才顯示；需主控端已同步 event2026/refs） */
 const SHOW_REFS = true;

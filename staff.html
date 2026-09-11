@@ -347,7 +347,7 @@ const GROUPS = [
      {id:"bmp1", t:"10:50-11:00", v:"A面", lb:"資格賽-1", a:P("張翔(Cliff)/孫秉家(Jack)"), b:P("林建志(Kenny)/林少睿")} ]},
    { title:"4強", ms:[
      {id:"bms1", t:"11:10-11:20", v:"B面", lb:"4強-1", a:P("黃祥焜(Yellow)/林彥成(Nick)"), b:W("bmp1")},
-     {id:"bms2", t:"11:30-11:40", v:"A面", lb:"4強-2", a:P("楊權(Chorld)/鄧起宇(Richard)"), b:P("陳志明(Raven)/謝東恩(Bryan)")} ]},
+     {id:"bms2", t:"11:30-11:40", v:"A面", lb:"4強-2", a:P("楊權(Chorld)/鄧起宇(Richard)"), b:P("謝東恩(Bryan)/陳毓升(Sam)")} ]},
    { title:"冠軍賽", ms:[
      {id:"bmf", t:"14:40-14:50", v:"A面", lb:"冠軍賽", star:true, a:W("bms1"), b:W("bms2"), crown:"冠軍"} ]} ]},
 { id:"bw", name:"羽球女雙", sport:"bad", sub:"4 組｜4強單淘汰｜抽籤代碼 E1276678EDAF7C8B",
@@ -372,7 +372,7 @@ const GROUPS = [
 { id:"bb", name:"籃球3對3", sport:"bb", sub:"5 組｜資格賽＋4強｜抽籤代碼 A4C662BB76FF5B50",
   cols:[
    { title:"資格賽", ms:[
-     {id:"bbp1", t:"11:00-11:10", v:"籃球場", lb:"資格賽-1", a:P("陳志明(Raven)/洪義凱(Wilkai)/鄧起宇(Richard)"), b:P("王漢雍(Mario)/林千翔(Coco)/吳彥輝(Nick)")} ]},
+     {id:"bbp1", t:"11:00-11:10", v:"籃球場", lb:"資格賽-1", a:P("洪義凱(Wilkai)/鄧起宇(Richard)/陳志明(Raven)"), b:P("王漢雍(Mario)/林千翔(Coco)/吳彥輝(Nick)")} ]},
    { title:"4強", ms:[
      {id:"bbs1", t:"11:20-11:30", v:"籃球場", lb:"4強-1", a:P("封智翔(Vito)/蘇威諺(Ziv)/林彥成(Nick)"), b:P("許世展(Ian)/康晉豪(Brian)/范書維(Derek)")},
      {id:"bbs2", t:"11:10-11:20", v:"籃球場", lb:"4強-2", a:P("陳立學(Lucas)/王聖翔(Shuan)/吳宇宸(Leo)"), b:W("bbp1")} ]},
@@ -399,7 +399,7 @@ const SHOOTERS = [
   ["1049","陳立學(Lucas)","FSB·FS3"],["1062","王聖翔(Shuan)","FSB·FS3"],["1073","謝安倪(Annie)","GAO·HRD"],["816","張博凱(Kenny)","MSB·MS1"],
   ["811","張瑋恬(Amy)","MSB·MS2"],["971","林千翔(Coco)","MSB·MS2"],["1068","王漢雍(Mario)","MSB·MS2"],["121","朱俊綱(Stanley)","PSB·PS1"],
   ["334","黃柏盛(Benson)","PSB·PS2"],["1028","洪祥盛(Joshua)","PSB·PS3"],["1037","林宛樺(Lena)","PSB·PS3"],["1056","楊勝傑(Allen)","PSB·PS3"],
-  ["1074","廖子鑫(Jason)","PSB·PS3"],["912","陳志明(Raven)","GAO·ITS"],["966","封智翔(Vito)","GAO·ITS"],["P118","黃禎宗(Zong)","FSE·PCMA"],
+  ["1074","廖子鑫(Jason)","PSB·PS3"],["966","封智翔(Vito)","GAO·ITS"],["P118","黃禎宗(Zong)","FSE·PCMA"],
   ["P147","蘇威諺(Ziv)","FSE·FCMA"]
 ];
 
@@ -420,7 +420,7 @@ function searchKeysOf(text){
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function fmtHM(min){ const h = Math.floor(min/60), m = min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); }
 /* 版號：與 index.html、board.html 同步遞增 */
-const APP_VER = "3.57.13";
+const APP_VER = "3.57.17";
 
 const SPORT_LABEL = { tt:"桌球", bad:"羽球", bb:"籃球" };
 const VENUE_LABEL = { "桌1":"🏓 桌1", "桌2":"🏓 桌2", "桌3":"🏓 桌3", "A面":"🏸 羽球A面", "B面":"🏸 羽球B面", "籃球場":"🏀 籃球場" };
@@ -768,7 +768,7 @@ function renderShoot(){
   const tieSet = {}; q.tieIds.forEach(i => { tieSet[i] = 1; });
   const finTie = {}; fi.tieIds.forEach(i => { finTie[i] = 1; });
   const sq = state.sq.trim().toLowerCase();
-  // 晉級名次一律以全體 29 人的預賽成績計算，搜尋與篩選只影響「顯示哪幾張卡片」
+  // 晉級名次一律以全體 28 人的預賽成績計算，搜尋與篩選只影響「顯示哪幾張卡片」
   const inTop = i => !!pos[i] || !!tieSet[i];
   const hits = SHOOTERS.map((p, i) => i).filter(i => {
     if (state.sf === "top4" && !inTop(i)) return false;
